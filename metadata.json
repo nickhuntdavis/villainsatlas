@@ -1,0 +1,7 @@
+{
+  "name": "The Villain's Atlas",
+  "description": "A curated field guide to the world's most imposing, ominous, and brutalist architecture. Discover real-world locations that look like supervillain lairs.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
