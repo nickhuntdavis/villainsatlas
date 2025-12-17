@@ -60,7 +60,7 @@ export const normalizeStyle = (style: string | undefined): string => {
 
 export const GENRE_COLORS: Record<string, string> = {
   // Soviet/Communist - Red tones
-  'Stalinist Gothic': '#ef4444', // Red-500
+  'Stalinist Gothic': '#f872a8', // Updated accent color
   'Soviet Modernism': '#dc2626', // Red-600
   'Socialist Classicism': '#b91c1c', // Red-700
   'Soviet Brutalism': '#991b1b', // Red-800

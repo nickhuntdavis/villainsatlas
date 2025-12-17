@@ -402,7 +402,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
         } else {
           console.log(`Skipped saving "${building.name}" – already exists in Baserow`);
         }
-      } catch (error) {
+  } catch (error) {
         console.warn(`Failed to save/update "${building.name}" in Baserow:`, error);
         // Don't throw - we still want to return the buildings even if save fails
       }

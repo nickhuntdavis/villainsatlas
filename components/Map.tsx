@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import { Coordinates, Building } from '../types';
 import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM } from '../constants';
 import { BuildingMarker } from './BuildingMarker';
+import { getThemeColors } from '../ui/theme';
 
 // Component to handle map center updates when props change
 const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
@@ -58,6 +59,7 @@ interface MapProps {
 
 export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme }) => {
   const isDark = theme === 'dark';
+  const colors = getThemeColors(theme);
 
   return (
     <MapContainer

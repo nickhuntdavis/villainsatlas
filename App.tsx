@@ -7,6 +7,7 @@ import { fetchLairs, geocodeLocation } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart } from 'lucide-react';
+import { PrimaryButton } from './ui/atoms';
 
 function App() {
   const [center, setCenter] = useState<Coordinates>(DEFAULT_COORDINATES);
@@ -145,13 +146,13 @@ function App() {
           
           setBuildings((prev) => mergeBuildings(prev, sortedResults));
           if (sortedResults.length > 0) {
-            setCenter(newCenter);
+             setCenter(newCenter);
           }
         } catch (err: any) {
           if (err?.isRateLimit || err?.message?.includes('rate limit') || err?.message?.includes('quota')) {
             setError("Too many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
           } else {
-            setError("Systems failed to identify structures in this sector.");
+          setError("Systems failed to identify structures in this sector.");
           }
         } finally {
           setLoading(false);
@@ -180,15 +181,15 @@ function App() {
     }
 
     buildingsOnly.forEach((b) => {
-      const dist = getDistance(location, b.coordinates);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearest = b;
-      }
-    });
+        const dist = getDistance(location, b.coordinates);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = b;
+        }
+      });
 
-    if (nearest) {
-      setSelectedBuilding(nearest);
+      if (nearest) {
+        setSelectedBuilding(nearest);
       setCenter(nearest.coordinates);
     }
   }, []);
@@ -291,13 +292,13 @@ function App() {
             setLoading(false);
           },
           () => {
-            // Fallback to center of screen
-            performFind(center);
-            setLoading(false);
+             // Fallback to center of screen
+             performFind(center);
+             setLoading(false);
           }
         );
       } else {
-        performFind(center);
+         performFind(center);
       }
     }
   }, [buildings, userLocation, center, searchAndFindNearest, findNearestBuilding]);
@@ -366,7 +367,7 @@ function App() {
       if (sortedResults.length > 0) {
         if (geocodedCoords) {
           setCenter(geocodedCoords);
-        } else {
+      } else {
           setCenter(sortedResults[0].coordinates);
         }
       } else if (geocodedCoords) {
@@ -393,7 +394,7 @@ function App() {
        } else if (err?.message?.includes('API Key')) {
          setError("API configuration error. Please check your Gemini API key.");
        } else {
-         setError("Connection to The Villain's Atlas Archives failed.");
+       setError("Connection to The Villain's Atlas Archives failed.");
        }
     } finally {
       setLoading(false);
@@ -573,13 +574,15 @@ function App() {
                <p>We track the brutal, the ominous, and the architectural manifestations of power.</p>
              </div>
 
-             <button 
+             <PrimaryButton 
+               theme={theme}
                onClick={handleLocateMe}
-               className="w-full py-4 bg-red-900 hover:bg-red-800 text-white font-bold uppercase tracking-widest transition-all flex items-center justify-center group"
+               fullWidth
+               className="py-4 font-bold uppercase tracking-widest flex items-center justify-center group"
              >
                 <AlertTriangle className="mr-2 group-hover:animate-pulse" size={18}/>
                 Initialize Scan
-             </button>
+             </PrimaryButton>
           </div>
         </div>
       )}
