@@ -7,6 +7,7 @@ import { fetchLairs, geocodeLocation } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart } from 'lucide-react';
+import { PrimaryButton } from './ui/atoms';
 
 function App() {
   const [center, setCenter] = useState<Coordinates>(DEFAULT_COORDINATES);
@@ -145,13 +146,13 @@ function App() {
           
           setBuildings((prev) => mergeBuildings(prev, sortedResults));
           if (sortedResults.length > 0) {
-            setCenter(newCenter);
+             setCenter(newCenter);
           }
         } catch (err: any) {
           if (err?.isRateLimit || err?.message?.includes('rate limit') || err?.message?.includes('quota')) {
             setError("Too many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
           } else {
-            setError("Systems failed to identify structures in this sector.");
+          setError("Systems failed to identify structures in this sector.");
           }
         } finally {
           setLoading(false);
@@ -180,15 +181,15 @@ function App() {
     }
 
     buildingsOnly.forEach((b) => {
-      const dist = getDistance(location, b.coordinates);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearest = b;
-      }
-    });
+        const dist = getDistance(location, b.coordinates);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = b;
+        }
+      });
 
-    if (nearest) {
-      setSelectedBuilding(nearest);
+      if (nearest) {
+        setSelectedBuilding(nearest);
       setCenter(nearest.coordinates);
     }
   }, []);
@@ -291,13 +292,13 @@ function App() {
             setLoading(false);
           },
           () => {
-            // Fallback to center of screen
-            performFind(center);
-            setLoading(false);
+             // Fallback to center of screen
+             performFind(center);
+             setLoading(false);
           }
         );
       } else {
-        performFind(center);
+         performFind(center);
       }
     }
   }, [buildings, userLocation, center, searchAndFindNearest, findNearestBuilding]);
@@ -366,7 +367,7 @@ function App() {
       if (sortedResults.length > 0) {
         if (geocodedCoords) {
           setCenter(geocodedCoords);
-        } else {
+      } else {
           setCenter(sortedResults[0].coordinates);
         }
       } else if (geocodedCoords) {
@@ -393,7 +394,7 @@ function App() {
        } else if (err?.message?.includes('API Key')) {
          setError("API configuration error. Please check your Gemini API key.");
        } else {
-         setError("Connection to The Villain's Atlas Archives failed.");
+       setError("Connection to The Villain's Atlas Archives failed.");
        }
     } finally {
       setLoading(false);
@@ -516,7 +517,7 @@ function App() {
   };
 
   return (
-    <div className={`relative w-screen h-screen overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-black' : 'bg-zinc-100'}`}>
+    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-black' : 'bg-zinc-100'}`}>
       
       {/* Search Bar - Floating */}
       <SearchPanel 
@@ -528,6 +529,7 @@ function App() {
         searchStatus={searchStatus}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        isSidebarOpen={!!selectedBuilding}
       />
 
       {/* Map Layer */}
@@ -552,7 +554,7 @@ function App() {
       {/* The "N" Button - Bottom Left */}
       <button
         onClick={handleNButton}
-        className="absolute bottom-6 left-6 z-20 w-12 h-12 bg-zinc-900/90 hover:bg-red-900/90 border border-zinc-700 hover:border-red-600 text-white transition-all backdrop-blur-md shadow-lg flex items-center justify-center group"
+        className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-20 w-12 h-12 bg-zinc-900/90 hover:bg-red-900/90 border border-zinc-700 hover:border-red-600 text-white transition-all backdrop-blur-md shadow-lg flex items-center justify-center group"
         title="The Architect"
       >
         <Heart size={20} className="text-red-500 group-hover:scale-110 group-hover:text-red-400 transition-all fill-red-500 group-hover:fill-red-400" />
@@ -573,20 +575,22 @@ function App() {
                <p>We track the brutal, the ominous, and the architectural manifestations of power.</p>
              </div>
 
-             <button 
+             <PrimaryButton 
+               theme={theme}
                onClick={handleLocateMe}
-               className="w-full py-4 bg-red-900 hover:bg-red-800 text-white font-bold uppercase tracking-widest transition-all flex items-center justify-center group"
+               fullWidth
+               className="py-4 font-bold uppercase tracking-widest flex items-center justify-center group"
              >
                 <AlertTriangle className="mr-2 group-hover:animate-pulse" size={18}/>
                 Initialize Scan
-             </button>
+             </PrimaryButton>
           </div>
         </div>
       )}
 
       {/* Error Toast */}
       {error && (
-        <div className="absolute bottom-6 right-6 z-50 max-w-sm bg-red-950/90 border-l-4 border-red-600 text-red-200 p-4 shadow-lg backdrop-blur-md flex items-start animate-in slide-in-from-bottom-5">
+        <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6 z-50 max-w-sm bg-red-950/90 border-l-4 border-red-600 text-red-200 p-4 shadow-lg backdrop-blur-md flex items-start animate-in slide-in-from-bottom-5">
           <AlertTriangle className="shrink-0 mr-3" size={20} />
           <div>
             <h4 className="font-bold uppercase text-xs tracking-wider mb-1">System Alert</h4>
@@ -597,7 +601,7 @@ function App() {
       )}
 
       {/* Branding overlay (bottom right) */}
-      <div className="absolute bottom-2 right-2 z-10 opacity-30 pointer-events-none">
+      <div className="absolute bottom-2 right-2 z-10 opacity-30 pointer-events-none hidden md:block">
         <h1 className="text-6xl font-black text-white tracking-tighter leading-none select-none">ATLAS</h1>
       </div>
     </div>

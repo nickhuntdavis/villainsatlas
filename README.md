@@ -115,15 +115,34 @@ node scripts/normalize-and-dedupe.js
 
 ---
 
-## Theming (Light / Dark)
+## Theming (Light / Dark) & Design System
 
-The app has a **global theme toggle**:
+The app has a **global theme toggle** and uses a **design system**:
 
-- Theme state is owned in `App.tsx` and persisted in `localStorage` under the key `theme`.
-- Components receive `theme: 'dark' | 'light'` as a prop and adjust Tailwind classes accordingly.
+- **Theme**: State is owned in `App.tsx` and persisted in `localStorage` under the key `evil-atlas-theme`.
+- **Design System**: Tokens → Atoms → Molecules → Organisms architecture.
+  - **Tokens** (`ui/theme.ts`): Central source for colors, typography, spacing, shadows, blur.
+  - **Atoms** (`ui/atoms/`): Reusable UI components (`IconButton`, `PrimaryButton`, `SurfaceCard`, `Badge`, `MarkerIcon`, `StatusStrip`).
+  - **Molecules** (`components/`): Composed components (`SearchPanel`, `BuildingDetails`) that use atoms.
+  - **Organisms**: Top-level orchestration (`App`, `Map`).
+- Components receive `theme: 'dark' | 'light'` as a prop and use design system tokens.
 - `components/Map.tsx` switches between `MAP_TILE_URL_DARK` and `MAP_TILE_URL_LIGHT`.
 
-Details of the current theme model, design tokens, and component hierarchy live in `docs/ui-style-overview.md`.
+**Important**: All UI styling should use the design system (tokens + atoms). Logic and data behavior remain unchanged. See `docs/ui-style-overview.md` for full details.
+
+### Internal Style Guide (`/style-guide`)
+
+There is an internal style guide page for design work:
+
+- **Route**: `/style-guide` (open `http://localhost:5173/style-guide` when running `npm run dev`).
+- **Component**: `ui/StyleGuide.tsx`.
+- **Contents**:
+  - Visual catalogue of tokens from `ui/theme.ts` (colors, typography, spacing, shadows, blur).
+  - Examples of atoms from `ui/atoms/` (`IconButton`, `PrimaryButton`, `SurfaceCard`, `Badge`, `StatusStrip`, marker icons).
+  - Static examples of key molecules (`SearchPanel`, `BuildingDetails`) using mock data.
+- **Guardrails**:
+  - Uses mock data only; does not call Baserow or Gemini.
+  - Intended for internal design and visual QA; production users should only see `/`.
 
 ---
 
@@ -131,8 +150,12 @@ Details of the current theme model, design tokens, and component hierarchy live 
 
 For now this repo is primarily for a single‑maintainer workflow. Some useful rules of thumb:
 
-- Logic & data behavior are treated as **frozen** unless intentionally changed with a clear plan.
-- UI changes should happen on `ui-refactor-design-system` and be reviewed there.
+- **Logic & data behavior** are treated as **frozen** unless intentionally changed with a clear plan (see `docs/current-state-and-rules.md`).
+- **UI changes** should use the design system:
+  - Use atoms from `ui/atoms/` before creating new UI elements.
+  - Use tokens from `ui/theme.ts` for colors, typography, spacing, etc.
+  - Pass `theme` prop down from parent components.
+  - UI changes should happen on `ui-refactor-design-system` branch and be reviewed there.
 - Keep `.env.local` and any private keys **out of Git**.
 
 If you open issues or PRs on GitHub, reference which branch and which part of the system (logic vs. UI) you are touching.

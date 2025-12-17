@@ -1,19 +1,22 @@
 ## UI Style & Design Overview
 
-This document describes how the current UI is styled in code. It is a **reference baseline** for future work on a design system and component library, without changing any application logic or data behavior.
+This document describes the design system structure and how UI is styled in code. The application now uses a **design system** with tokens, atoms, molecules, and organisms, while preserving all application logic and data behavior.
 
 ---
 
 ## 1. Tech Stack & Styling Approach
 
 - **Framework**: React + Vite.
+- **Design System**: Tokens → Atoms → Molecules → Organisms architecture.
 - **Styling**:
-  - Tailwind-like utility classes used directly in `className` strings (`bg-zinc-900`, `text-zinc-100`, `backdrop-blur-md`, etc.).
-  - Custom SVG and inline styles for map pins (`BuildingMarker`).
-  - Theme handled in React state and persisted to `localStorage`, with a `data-theme` attribute on `<html>` for future global theming hooks.
+  - **Tokens**: Central theme/tokens module (`ui/theme.ts`) defines all colors, typography, spacing, shadows, and blur values.
+  - **Atoms**: Reusable UI components (`ui/atoms/`) like `IconButton`, `PrimaryButton`, `SurfaceCard`, `Badge`, `MarkerIcon`, `StatusStrip`.
+  - **Molecules**: Composed components (`components/`) like `SearchPanel`, `BuildingDetails` that use atoms.
+  - **Organisms**: Top-level components (`App`, `Map`) that orchestrate molecules.
+  - Theme handled in React state and persisted to `localStorage`, with a `data-theme` attribute on `<html>`.
 - **Icons**: `lucide-react` (e.g. `Search`, `Locate`, `Crosshair`, `MapPin`, `Navigation`, `Heart`, `SunMedium`, `Moon`).
 
-For the design-system refactor, you can assume all color/spacing/typography is currently defined **inline** and will need to be abstracted into tokens and reusable components.
+All styling now flows from tokens through atoms to molecules/organisms, ensuring consistency and making global style changes easy.
 
 ---
 
@@ -98,129 +101,153 @@ These typography patterns should become **type styles** in the design system (e.
 
 ### 4.1 Design System (Tokens & Theme)
 
-Currently implicit, to be formalized into:
+**Location**: `ui/theme.ts`
 
 - **Tokens**:
-  - Colors (background, surface, border, text, accent, genre).
-  - Radii (e.g. rounded `md`, `lg`, full).
-  - Shadows (e.g. `shadow-2xl` for panels, strong pin drop shadow via inline style).
-  - Blur (`backdrop-blur-md` for glassy surfaces).
-  - Spacing/stacking (`p-6`, `gap-2`, `mt-8`, etc.).
+  - Colors: `colors.dark` and `colors.light` objects with `background`, `border`, `text`, and `accent` properties.
+  - Typography: `typography.heading`, `typography.body`, `typography.label`, `typography.mono` with predefined scales.
+  - Spacing: `spacing` object with `xs`, `sm`, `md`, `lg`, `xl`, `2xl`.
+  - Radii: `radius` object with `none`, `sm`, `md`, `lg`, `full`.
+  - Shadows: `shadows` object with `sm`, `md`, `lg`, `xl`, `2xl`.
+  - Blur: `blur` object with `sm`, `md`, `lg`.
+  - Genre colors: Re-exported `GENRE_COLORS` from `constants.ts` for architectural style colors.
 - **Theme**:
-  - Boolean `'dark' | 'light'` driving:
-    - Tile theme.
-    - Panel backgrounds and borders.
-    - Text colors and button states.
+  - Type: `Theme = 'dark' | 'light'`.
+  - Helper: `getThemeColors(theme)` returns the appropriate color object for the theme.
+  - Theme is passed as a prop to all atoms and molecules.
 
 ### 4.2 Atoms
 
-These are the smallest UI building blocks in the current codebase:
+**Location**: `ui/atoms/`
 
-- **Icons** (from `lucide-react`):
-  - `Search`, `Loader2`, `Locate`, `Crosshair`, `MapPin`, `Navigation`, `ImageOff`, `Heart`, `SunMedium`, `Moon`, `AlertTriangle`, `Info`.
-  - Styling is mostly color-only (`text-zinc-500`, `group-hover:text-red-500`, etc.).
-- **Pins / Markers** (`BuildingMarker.tsx`):
-  - **Standard pin**:
-    - Custom SVG via `divIcon` with:
-      - Rotated square (45°) with one rounded corner to mimic a sharp pin.
-      - `box-shadow: 0 4px 10px rgba(0,0,0,0.8)`.
-      - Border `2px solid #09090b`.
-      - Inner dark circle “core”.
-    - Color from `GENRE_COLORS` or default fallback.
-  - **Nick pin**:
-    - Red heart SVG (`#ef4444`) with drop shadow.
-  - Size:
-    - Normal: `24px`.
-    - Selected: `32px`.
-- **Buttons**:
-  - Not yet abstracted, but repeated patterns:
-    - Icon-only buttons (e.g. locate, close, theme toggle).
-    - Icon + label buttons (Here, Nearest, Verify Intel).
-    - Primary action button (search submit).
+These are the smallest reusable UI building blocks:
 
-These will be ideal to turn into `IconButton`, `PrimaryButton`, `Chip`, `MarkerIcon`, etc.
+- **IconButton** (`IconButton.tsx`):
+  - Icon-only button with theme support.
+  - Variants: `default`, `accent`, `subtle`.
+  - Props: `theme`, `onClick`, `icon`, `title`, `disabled`, `variant`, `className`.
+- **PrimaryButton** (`PrimaryButton.tsx`):
+  - Main action button (e.g., search submit).
+  - Props: `theme`, `onClick`, `type`, `disabled`, `children`, `fullWidth`, `className`.
+- **SurfaceCard** (`SurfaceCard.tsx`):
+  - Generic panel/container with themed background, border, optional blur and shadow.
+  - Levels: `default`, `elevated`, `panel`.
+  - Props: `theme`, `children`, `level`, `withBlur`, `withShadow`, `className`.
+- **Badge** (`Badge.tsx`):
+  - Small label/badge for style tags, prioritized indicators, etc.
+  - Supports custom color (hex) for genre/style colors.
+  - Props: `theme`, `children`, `color`, `className`.
+- **MarkerIcon** (`MarkerIcon.tsx`):
+  - Factory function `createMarkerIcon()` that returns a Leaflet `divIcon`.
+  - Variants: `standard` (rotated square pin) or `nick` (red heart).
+  - Props: `color` (hex), `isSelected`, `variant`.
+  - Size: `24px` normal, `32px` selected.
+- **StatusStrip** (`StatusStrip.tsx`):
+  - Loading/status message display with mono typography.
+  - Props: `theme`, `statusText`, `isVisible`.
+
+All atoms accept a `theme` prop and use tokens from `ui/theme.ts` for consistent styling.
 
 ### 4.3 Molecules
 
-#### Search Panel (`SearchPanel.tsx`)
+#### Search Panel (`components/SearchPanel.tsx`)
 
-- Composition:
-  - Text input, locate button, “Here” button, “Nearest” button, theme toggle, search submit.
-  - Floating card centered at top on desktop, full-width on mobile.
-- Dark mode:
-  - Container: `bg-zinc-900/90 border-zinc-700`.
-  - Input text: `text-zinc-100`, placeholders `text-zinc-500`.
-  - Buttons: red accents and darker hover backgrounds.
-- Light mode:
-  - Container: `bg-zinc-100/95 border-zinc-300`.
-  - Input text: `text-zinc-900`, placeholders `text-zinc-400`.
-  - Buttons: lighter backgrounds (`bg-red-600` → `bg-red-700` for primary; red text + `bg-red-50` hover for secondary).
-- Loading messages:
-  - Rotating status line below the search bar in red mono text.
+- **Composition**: Uses `SurfaceCard`, `IconButton`, `PrimaryButton`, `StatusStrip` atoms.
+- **Structure**:
+  - Text input with theme-aware placeholder colors.
+  - `IconButton` for locate action.
+  - Text buttons for "Here" and "Nearest" (using typography tokens).
+  - `IconButton` for theme toggle.
+  - `PrimaryButton` for search submit.
+  - `StatusStrip` for loading messages.
+- **Styling**: All visual styling comes from atoms and tokens; no inline color classes.
 
-#### Building Marker (`BuildingMarker.tsx`)
+#### Building Marker (`components/BuildingMarker.tsx`)
 
-- Atomically a pin, but functionally a molecule because it:
-  - Encapsulates the custom marker icon.
-  - Knows about selection state and map fly-to animation.
-  - Embeds style-based color logic.
+- **Composition**: Uses `createMarkerIcon()` atom factory.
+- **Functionality**:
+  - Encapsulates marker icon creation via design system.
+  - Handles selection state and map fly-to animation.
+  - Determines color from genre/style or prioritized status.
+  - Detects "Nick" variant for heart icon.
 
 ### 4.4 Organisms
 
 #### Map (`components/Map.tsx`)
 
-- Full-screen map organism:
-  - `MapContainer` with dark/light tile choice.
+- **Composition**: Uses `getThemeColors()` for background styling.
+- **Functionality**:
+  - `MapContainer` with dark/light tile choice (from constants).
   - `MapUpdater` for smooth fly-to on center change.
-  - `MapBoundsTracker` to expose bounds back to `App` for “Here” searches.
-  - Renders all `BuildingMarker` atoms for current `buildings` state.
+  - `MapBoundsTracker` to expose bounds back to `App` for "Here" searches.
+  - Renders all `BuildingMarker` molecules for current `buildings` state.
+- **Styling**: Background color from theme tokens.
 
-#### Building Details Panel (`BuildingDetails.tsx`)
+#### Building Details Panel (`components/BuildingDetails.tsx`)
 
-- Sliding side/bottom panel showing:
-  - Header image with gradient overlay (dark vs light).
-  - Style badge using genre colors.
-  - Name, location line, description.
-  - “Verify Intel (Google Maps)” button with themed surface/border.
-  - Lat/Lng footer with mono text.
-- Dark vs light:
-  - Dark:
-    - `bg-zinc-950/95`, `border-zinc-800`, text `text-white` / `text-zinc-300`.
-  - Light:
-    - `bg-white/95`, `border-zinc-200`, text `text-zinc-900` / `text-zinc-700`.
+- **Composition**: Uses `SurfaceCard`, `IconButton`, `Badge`, typography tokens.
+- **Structure**:
+  - `SurfaceCard` wrapper with blur and shadow.
+  - Header image with gradient overlay (theme-aware).
+  - `Badge` for style label with genre color.
+  - Typography tokens for heading, body, and mono text.
+  - Link button for "Verify Intel" (styled with tokens).
+  - Footer with coordinates using mono typography.
+- **Styling**: All surfaces, badges, and text use design system tokens.
 
 #### App Shell (`App.tsx`)
 
-- Orchestrates:
-  - Global background and theme.
-  - Search panel (top).
-  - Map canvas (center).
-  - Building details drawer (side/bottom).
-  - “N” button (fixed bottom-left heart button with glowing hover states).
+- **Orchestration**:
+  - Global background from theme tokens.
+  - Theme state management and persistence.
+  - Search panel molecule (top).
+  - Map organism (center).
+  - Building details molecule (side/bottom).
+  - "N" button (fixed bottom-left, uses inline styles for special effect).
 
 ---
 
-## 5. Future Design System & Component Library Hooks
+## 5. Style Guide Page (`/style-guide`)
 
-This current structure lends itself to a layered refactor:
+- **Location**: `ui/StyleGuide.tsx`.
+- **Access**: Run the app and open `/style-guide` in the browser (e.g. `http://localhost:5173/style-guide`).
+- **Purpose**: Internal-only visual catalogue of tokens, atoms, and molecules.
+  - **Tokens section**: Shows color, typography, spacing, radius, and shadow tokens from `ui/theme.ts`.
+  - **Atoms section**: Renders examples of `PrimaryButton`, `IconButton`, `SurfaceCard`, `Badge`, `StatusStrip`, and marker icons.
+  - **Molecules section**: Shows static `SearchPanel` and `BuildingDetails` examples using mock data.
+- **Behavior**:
+  - Uses the same theme model (`evil-atlas-theme` in `localStorage`) as `App.tsx`.
+  - Does **not** call Baserow, Gemini, or Google APIs; all data is mocked.
+  - Exists purely for design and visual QA; production users should only see `/`.
 
-1. **Extract tokens**:
-   - Move color hexes and classnames into a central theme config (e.g. `theme.ts` or Tailwind config).
-   - Create named tokens for:
-     - Backgrounds (`surface.default.dark`, `surface.default.light`).
-     - Borders (`border.subtle`, `border.strong`).
-     - Text (`text.primary`, `text.muted`, etc.).
-     - Accents (`accent.primary`, `accent.warning`).
-2. **Abstract atoms**:
-   - `IconButton`, `PrimaryButton`, `SurfaceCard`, `Badge`, `Tag`, `Pill`.
-   - `MarkerIcon` variants: standard, prioritized, special (Nick).
-3. **Refine molecules**:
-   - `SearchBar` component accepting generic callbacks and tokens.
-   - `StatusStrip` for loading messages.
-   - `StyleBadge`, `CoordinateRow`, etc.
-4. **Lock organisms**:
-   - `AtlasMap`, `BuildingDrawer`, and `AppShell` should compose atoms/molecules only, with no inline styles.
+---
 
-Throughout this work, the guiding constraint is: **no logic or data behavior changes**—only presentation and component structure refactors on top of the current styling semantics described above.
+## 6. Design System Usage Guidelines
 
+### How to Use the Design System
 
+1. **For new components**:
+   - Always start with atoms from `ui/atoms/` before creating new UI elements.
+   - Use tokens from `ui/theme.ts` for colors, typography, spacing, etc.
+   - Pass `theme` prop down from parent components.
+
+2. **For styling changes**:
+   - **Global changes**: Modify tokens in `ui/theme.ts` (e.g., change accent color, typography scale).
+   - **Component-specific**: Override with `className` prop on atoms, or create new atom variants if needed.
+   - **Genre colors**: Modify `GENRE_COLORS` in `constants.ts` (re-exported by theme).
+
+3. **Component hierarchy**:
+   - **Atoms** (`ui/atoms/`): Smallest reusable pieces (buttons, badges, cards).
+   - **Molecules** (`components/`): Composed UI sections (SearchPanel, BuildingDetails).
+   - **Organisms** (`App.tsx`, `Map.tsx`): Top-level orchestration.
+
+4. **Theme-aware components**:
+   - All atoms accept `theme: 'dark' | 'light'` prop.
+   - Molecules receive theme from parent and pass to atoms.
+   - Use `getThemeColors(theme)` helper when needed for conditional styling.
+
+### Important Constraints
+
+- **No logic changes**: The design system refactor preserves all application logic, data flow, and API behavior exactly as documented in `docs/current-state-and-rules.md`.
+- **Backward compatibility**: All existing props and behaviors remain unchanged; only styling implementation uses the design system.
+- **Token-first**: Prefer using tokens over hardcoded Tailwind classes when possible.

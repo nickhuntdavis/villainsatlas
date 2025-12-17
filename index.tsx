@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { StyleGuide } from './ui/StyleGuide';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -8,8 +9,14 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+
+// Simple, dependency-free routing:
+// - "/" renders the main App (map experience)
+// - "/style-guide" renders the internal design system style guide
+const path = window.location.pathname;
+
 root.render(
   <React.StrictMode>
-    <App />
+    {path === '/style-guide' ? <StyleGuide /> : <App />}
   </React.StrictMode>
 );

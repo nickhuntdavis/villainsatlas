@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Building } from '../types';
 import { X, MapPin, Navigation, ImageOff } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyle } from '../constants';
+import { IconButton, PrimaryButton, SurfaceCard, Badge } from '../ui/atoms';
+import { typography, getThemeColors } from '../ui/theme';
 
 interface BuildingDetailsProps {
   building: Building | null;
@@ -33,8 +35,9 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
   }, [building]);
 
   if (!building) return null;
-  
+
   const isDark = theme === 'dark';
+  const colors = getThemeColors(theme);
 
   // Extract clean image URL (handle markdown format)
   const cleanImageUrl = extractUrlFromMarkdown(building.imageUrl);
@@ -43,14 +46,12 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
   const styleColor = GENRE_COLORS[normalizedStyle] || GENRE_COLORS['Other'];
 
   return (
-    <div
-      className={`absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-r border-t md:border-t-0 backdrop-blur-sm p-0 z-20 flex flex-col shadow-2xl transition-all duration-300 ease-in-out h-auto max-h-[85vh] md:max-h-full overflow-y-auto custom-scrollbar
-        ${
-          isDark
-            ? 'border-zinc-800 bg-zinc-950/95'
-            : 'border-zinc-200 bg-white/95'
-        }
-      `}
+    <SurfaceCard
+      theme={theme}
+      level="panel"
+      withBlur
+      withShadow
+      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-r border-t md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(85dvh-6rem)] md:max-h-full overflow-y-auto custom-scrollbar"
     >
       
       {/* Image Header */}
@@ -87,13 +88,14 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
           </div>
         )}
         
-        <button 
+        <button
           onClick={onClose}
           className={`absolute top-4 right-4 p-2 backdrop-blur-md rounded-full transition-colors z-10 border ${
             isDark
               ? 'bg-black/50 hover:bg-black/80 text-zinc-300 hover:text-white border-white/10'
               : 'bg-white/80 hover:bg-white text-zinc-700 hover:text-black border-zinc-200'
           }`}
+          title="Close"
         >
           <X size={16} />
         </button>
@@ -101,45 +103,24 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
 
       <div className="p-6 flex flex-col flex-1">
         {building.style && (
-          <div className="flex justify-between items-start mb-4">
-            <span 
-              className={`text-[10px] font-bold tracking-[0.2em] uppercase px-2 py-1 rounded-sm border ${
-                isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-100 border-zinc-300'
-              }`}
-              style={{ color: styleColor }}
-            >
-              {building.style}
-            </span>
-          </div>
+        <div className="flex justify-between items-start mb-4">
+          <Badge theme={theme} color={styleColor}>
+            {building.style}
+          </Badge>
+        </div>
         )}
 
-        <h2
-          className={`text-3xl font-black mb-2 uppercase tracking-tighter leading-none break-words ${
-            isDark ? 'text-white' : 'text-zinc-900'
-          }`}
-        >
+        <h2 className={`${typography.heading.lg} mb-2 leading-none break-words ${colors.text.primary}`}>
           {building.name}
         </h2>
 
-        <div
-          className={`flex items-center mb-6 text-sm ${
-            isDark ? 'text-zinc-500' : 'text-zinc-600'
-          }`}
-        >
+        <div className={`flex items-center mb-6 text-sm ${colors.text.muted}`}>
           <MapPin size={14} className="mr-1" />
           <span className="uppercase tracking-wide text-xs">{building.location}</span>
         </div>
 
-        <div
-          className={`prose prose-sm mb-8 border-l-2 pl-4 ${
-            isDark ? 'prose-invert border-zinc-800' : 'border-zinc-200'
-          }`}
-        >
-          <p
-            className={`leading-relaxed italic text-sm ${
-              isDark ? 'text-zinc-300' : 'text-zinc-700'
-            }`}
-          >
+        <div className={`prose prose-sm mb-8 border-l-2 pl-4 ${isDark ? 'prose-invert border-zinc-800' : 'border-zinc-200'}`}>
+          <p className={`leading-relaxed italic text-sm ${colors.text.tertiary}`}>
             "{building.description}"
           </p>
         </div>
@@ -174,17 +155,15 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
             }
 
             return mapsUrl ? (
-              <a 
-                href={mapsUrl} 
-                target="_blank" 
+              <a
+                href={mapsUrl}
+                target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center w-full py-3 uppercase text-xs font-bold tracking-widest transition-all group border
-                  ${
-                    isDark
-                      ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500'
-                      : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300 hover:border-zinc-400'
-                  }
-                `}
+                className={`flex items-center justify-center w-full py-3 ${typography.label.button} transition-all group border ${
+                  isDark
+                    ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500'
+                    : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300 hover:border-zinc-400'
+                }`}
               >
                 <Navigation size={14} className="mr-2 group-hover:text-red-500" />
                 Verify Intel (Google Maps)
@@ -194,21 +173,13 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
         </div>
         
         {/* Decorative Elements for Vibe */}
-        <div
-          className={`mt-8 pt-6 border-t ${
-            isDark ? 'border-zinc-900' : 'border-zinc-200'
-          }`}
-        >
-          <div
-            className={`flex justify-between text-[10px] font-mono uppercase ${
-              isDark ? 'text-zinc-600' : 'text-zinc-500'
-            }`}
-          >
+        <div className={`mt-8 pt-6 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-200'}`}>
+          <div className={`flex justify-between ${typography.mono.sm} ${colors.text.muted}`}>
              <span>Lat: {building.coordinates.lat.toFixed(4)}</span>
              <span>Lng: {building.coordinates.lng.toFixed(4)}</span>
           </div>
         </div>
       </div>
-    </div>
+    </SurfaceCard>
   );
 };

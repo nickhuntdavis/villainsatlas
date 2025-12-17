@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import { Coordinates, Building } from '../types';
 import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM } from '../constants';
 import { BuildingMarker } from './BuildingMarker';
+import { getThemeColors } from '../ui/theme';
 
 // Component to handle map center updates when props change
 const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
@@ -10,6 +11,32 @@ const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
   useEffect(() => {
     map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 2 });
   }, [center, map]);
+  return null;
+};
+
+// Component to fix map size issues on initial load and window resize
+const MapSizeFixer: React.FC = () => {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Fix size immediately after mount (with small delay to ensure CSS has applied)
+    const timeoutId = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    
+    // Also fix on window resize
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
+  
   return null;
 };
 
@@ -58,6 +85,7 @@ interface MapProps {
 
 export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme }) => {
   const isDark = theme === 'dark';
+  const colors = getThemeColors(theme);
 
   return (
     <MapContainer
@@ -73,6 +101,7 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
       />
       <ZoomControl position="topright" />
       
+      <MapSizeFixer />
       <MapUpdater center={center} />
       <MapBoundsTracker onBoundsRequest={onBoundsRequest} />
 
