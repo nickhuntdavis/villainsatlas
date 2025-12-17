@@ -517,7 +517,7 @@ function App() {
   };
 
   return (
-    <div className={`relative w-screen h-screen overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-black' : 'bg-zinc-100'}`}>
+    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-black' : 'bg-zinc-100'}`}>
       
       {/* Search Bar - Floating */}
       <SearchPanel 
@@ -529,6 +529,7 @@ function App() {
         searchStatus={searchStatus}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        isSidebarOpen={!!selectedBuilding}
       />
 
       {/* Map Layer */}
@@ -553,7 +554,7 @@ function App() {
       {/* The "N" Button - Bottom Left */}
       <button
         onClick={handleNButton}
-        className="absolute bottom-6 left-6 z-20 w-12 h-12 bg-zinc-900/90 hover:bg-red-900/90 border border-zinc-700 hover:border-red-600 text-white transition-all backdrop-blur-md shadow-lg flex items-center justify-center group"
+        className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-20 w-12 h-12 bg-zinc-900/90 hover:bg-red-900/90 border border-zinc-700 hover:border-red-600 text-white transition-all backdrop-blur-md shadow-lg flex items-center justify-center group"
         title="The Architect"
       >
         <Heart size={20} className="text-red-500 group-hover:scale-110 group-hover:text-red-400 transition-all fill-red-500 group-hover:fill-red-400" />
@@ -589,7 +590,7 @@ function App() {
 
       {/* Error Toast */}
       {error && (
-        <div className="absolute bottom-6 right-6 z-50 max-w-sm bg-red-950/90 border-l-4 border-red-600 text-red-200 p-4 shadow-lg backdrop-blur-md flex items-start animate-in slide-in-from-bottom-5">
+        <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6 z-50 max-w-sm bg-red-950/90 border-l-4 border-red-600 text-red-200 p-4 shadow-lg backdrop-blur-md flex items-start animate-in slide-in-from-bottom-5">
           <AlertTriangle className="shrink-0 mr-3" size={20} />
           <div>
             <h4 className="font-bold uppercase text-xs tracking-wider mb-1">System Alert</h4>
@@ -600,7 +601,7 @@ function App() {
       )}
 
       {/* Branding overlay (bottom right) */}
-      <div className="absolute bottom-2 right-2 z-10 opacity-30 pointer-events-none">
+      <div className="absolute bottom-2 right-2 z-10 opacity-30 pointer-events-none hidden md:block">
         <h1 className="text-6xl font-black text-white tracking-tighter leading-none select-none">ATLAS</h1>
       </div>
     </div>

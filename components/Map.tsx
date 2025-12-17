@@ -14,6 +14,32 @@ const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
   return null;
 };
 
+// Component to fix map size issues on initial load and window resize
+const MapSizeFixer: React.FC = () => {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Fix size immediately after mount (with small delay to ensure CSS has applied)
+    const timeoutId = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    
+    // Also fix on window resize
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
+  
+  return null;
+};
+
 // Component to track map bounds and expose them via callback
 interface MapBoundsTrackerProps {
   onBoundsRequest?: (getBounds: () => { north: number; south: number; east: number; west: number } | null) => void;
@@ -75,6 +101,7 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
       />
       <ZoomControl position="topright" />
       
+      <MapSizeFixer />
       <MapUpdater center={center} />
       <MapBoundsTracker onBoundsRequest={onBoundsRequest} />
 

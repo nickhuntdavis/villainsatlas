@@ -51,7 +51,7 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
       level="panel"
       withBlur
       withShadow
-      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-r border-t md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[85vh] md:max-h-full overflow-y-auto custom-scrollbar"
+      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-r border-t md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(85dvh-6rem)] md:max-h-full overflow-y-auto custom-scrollbar"
     >
       
       {/* Image Header */}

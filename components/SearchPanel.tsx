@@ -12,6 +12,7 @@ interface SearchPanelProps {
   searchStatus: 'idle' | 'searching_baserow' | 'searching_gemini';
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  isSidebarOpen?: boolean;
 }
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({
@@ -23,6 +24,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   searchStatus,
   theme,
   onToggleTheme,
+  isSidebarOpen = false,
 }) => {
   const [query, setQuery] = useState('');
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
@@ -61,15 +63,19 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   const colors = getThemeColors(theme);
 
   return (
-    <div className="absolute top-4 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 z-10 w-auto md:min-w-[720px] flex flex-col gap-2 pointer-events-none">
-      <form onSubmit={handleSubmit} className="relative group pointer-events-auto">
+    <div className={`absolute top-4 left-4 right-4 z-10 flex flex-col gap-2 pointer-events-none transition-all duration-300 ${
+      isSidebarOpen 
+        ? 'md:left-[calc(24rem+1.5rem)] md:right-[3.25rem] md:w-auto md:flex md:items-center' 
+        : 'md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto'
+    }`}>
+      <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`}>
         <div className="absolute inset-0 bg-red-900/10 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
         <SurfaceCard
           theme={theme}
           level="panel"
           withBlur
           withShadow
-          className="relative flex items-center rounded-lg p-1 overflow-hidden focus-within:ring-1 transition-all"
+          className={`relative flex items-center rounded-lg p-1 overflow-hidden focus-within:ring-1 transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`}
         >
           <input
             type="text"
