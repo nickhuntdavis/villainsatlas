@@ -34,13 +34,13 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard' }: Ma
       </div>
     `;
   } else {
-    // Standard sharp, angular pin shape
+    // Standard sharp, angular pin shape (flipped upside down)
     html = `
       <div style="
         width: ${size}px;
         height: ${size}px;
         background-color: ${color};
-        transform: rotate(45deg);
+        transform: rotate(225deg);
         border-radius: 0 50% 50% 50%;
         box-shadow: 0 4px 10px rgba(0,0,0,0.8);
         border: 2px solid #09090b; 

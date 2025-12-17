@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building } from '../types';
+import { Building, Coordinates } from '../types';
 import { X, MapPin, Navigation, ImageOff, User } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyle } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
@@ -8,6 +8,7 @@ interface BuildingDetailsProps {
   building: Building | null;
   onClose: () => void;
   theme: 'dark' | 'light';
+  userLocation?: Coordinates | null;
 }
 
 // Helper function to extract URL from markdown link format [text](url) or just return URL if already plain
@@ -25,7 +26,31 @@ const extractUrlFromMarkdown = (urlString: string | undefined): string | undefin
   return urlString;
 };
 
-export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme }) => {
+// Helper to calculate distance in meters (Haversine formula)
+const getDistance = (coord1: Coordinates, coord2: Coordinates): number => {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = (coord1.lat * Math.PI) / 180;
+  const φ2 = (coord2.lat * Math.PI) / 180;
+  const Δφ = ((coord2.lat - coord1.lat) * Math.PI) / 180;
+  const Δλ = ((coord2.lng - coord1.lng) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+// Helper to format distance for display
+const formatDistance = (meters: number): string => {
+  if (meters < 1000) {
+    return `${Math.round(meters)}m`;
+  }
+  return `${(meters / 1000).toFixed(1)}km`;
+};
+
+export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation }) => {
   const [imgError, setImgError] = useState(false);
 
   // Reset error state when building changes
@@ -61,14 +86,6 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
             />
           </div>
         ) : null}
-        
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 bg-[#010E36] text-[#A382FF] hover:opacity-80 rounded-full transition-colors z-10"
-          title="Close"
-        >
-          <X size={16} className="text-[#A382FF]" />
-        </button>
       </div>
 
       <div className="p-8 flex flex-col flex-1">
@@ -77,7 +94,26 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
           <div className="bg-[#282C55] rounded-[4px] px-3 py-1.5 inline-block">
             <span className="text-white text-sm font-medium">{building.style}</span>
           </div>
+          <button
+            onClick={onClose}
+            className="p-2 bg-[#010E36] text-[#A382FF] hover:opacity-80 rounded-full transition-colors"
+            title="Close"
+          >
+            <X size={16} className="text-[#A382FF]" />
+          </button>
         </div>
+        )}
+        
+        {!building.style && (
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={onClose}
+              className="p-2 bg-[#010E36] text-[#A382FF] hover:opacity-80 rounded-full transition-colors"
+              title="Close"
+            >
+              <X size={16} className="text-[#A382FF]" />
+            </button>
+          </div>
         )}
 
         <h2 className={`${fontFamily.heading} mb-4 break-words text-white`} style={{ fontSize: 'clamp(32px, 3.5vw, 4.5rem)', lineHeight: '1.1' }}>
@@ -142,17 +178,27 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                 href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center w-full py-4 bg-[#A382FF] text-[#020716] rounded-[12px] transition-all group hover:opacity-90"
+                className="flex items-center justify-center w-full py-4 bg-[#A382FF] text-[#020716] rounded-[12px] transition-all group hover:opacity-90 font-bold"
               >
-                <Navigation size={16} className="mr-2 text-[#020716]" />
+                <Navigation size={16} className="mr-2 text-[#020716]" strokeWidth={2.5} />
                 Show on Google Maps
               </a>
             ) : null;
           })()}
         </div>
         
+        {/* Estimated Distance */}
+        {userLocation && building && (
+          <div className="mt-8 pt-6 border-t border-white/20">
+            <div className={`${typography.body.sm} text-white`}>
+              <span className="opacity-70">Estimated distance: </span>
+              <span className="font-medium">{formatDistance(getDistance(userLocation, building.coordinates))}</span>
+            </div>
+          </div>
+        )}
+        
         {/* Coordinates */}
-        <div className="mt-8 pt-6 border-t border-white/20">
+        <div className={`mt-8 pt-6 border-t border-white/20 ${userLocation ? '' : 'mt-8'}`}>
           <div className={`flex justify-between ${typography.mono.sm} text-white`}>
              <span>Lat: {building.coordinates.lat.toFixed(4)}</span>
              <span>Lng: {building.coordinates.lng.toFixed(4)}</span>

@@ -43,20 +43,122 @@ function App() {
   }, [theme]);
 
 
-  // Merge helper to keep markers persistent without duplicates
+  // Helper to normalize names for fuzzy matching
+  const normalizeName = (name: string): string => {
+    return name.toLowerCase()
+      .replace(/[^\w\s]/g, '') // Remove punctuation
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+
+  // Helper to calculate similarity between two normalized names (simple Levenshtein-like)
+  const nameSimilarity = (name1: string, name2: string): number => {
+    const norm1 = normalizeName(name1);
+    const norm2 = normalizeName(name2);
+    
+    // Exact match after normalization
+    if (norm1 === norm2) return 1.0;
+    
+    // One contains the other (high similarity)
+    if (norm1.includes(norm2) || norm2.includes(norm1)) {
+      const shorter = Math.min(norm1.length, norm2.length);
+      const longer = Math.max(norm1.length, norm2.length);
+      return shorter / longer;
+    }
+    
+    // Calculate word overlap
+    const words1 = new Set(norm1.split(' ').filter(w => w.length > 2));
+    const words2 = new Set(norm2.split(' ').filter(w => w.length > 2));
+    if (words1.size === 0 || words2.size === 0) return 0;
+    
+    const intersection = [...words1].filter(w => words2.has(w)).length;
+    const union = new Set([...words1, ...words2]).size;
+    return intersection / union;
+  };
+
+  // Helper to check if two buildings are likely the same (fuzzy match)
+  const areLikelySame = (b1: Building, b2: Building): boolean => {
+    // Check name similarity
+    const nameSim = nameSimilarity(b1.name, b2.name);
+    if (nameSim < 0.6) return false; // Names too different
+    
+    // Check if coordinates are close (within 500m)
+    const distance = getDistance(b1.coordinates, b2.coordinates);
+    return distance < 500;
+  };
+
+  // Helper to score building quality (prefer ones with Google Place ID and images)
+  const getBuildingScore = (b: Building): number => {
+    let score = 0;
+    if (b.googlePlaceId) score += 10;
+    if (b.imageUrl) score += 5;
+    if (b.gmapsUrl) score += 2;
+    if (b.description) score += 1;
+    return score;
+  };
+
+  // Merge helper to keep markers persistent without duplicates (with fuzzy matching)
   const mergeBuildings = (existing: Building[], incoming: Building[]): Building[] => {
     const byId = new Map<string, Building>();
+    const processed = new Set<string>();
+    
+    // First, add all existing buildings
     existing.forEach((b) => {
       byId.set(b.id, b);
     });
-    incoming.forEach((b) => {
-      const current = byId.get(b.id);
-      if (current) {
-        byId.set(b.id, { ...current, ...b });
+    
+    // Process incoming buildings
+    incoming.forEach((incomingB) => {
+      // Check for exact ID match first
+      if (byId.has(incomingB.id)) {
+        const existingB = byId.get(incomingB.id)!;
+        // Prefer building with higher score (Google Place ID, images, etc.)
+        if (getBuildingScore(incomingB) > getBuildingScore(existingB)) {
+          byId.set(incomingB.id, { ...existingB, ...incomingB });
+        } else {
+          // Merge properties, keeping existing building as base
+          byId.set(incomingB.id, { ...incomingB, ...existingB });
+        }
+        processed.add(incomingB.id);
+        return;
+      }
+      
+      // Check for fuzzy match with existing buildings
+      let fuzzyMatch: Building | null = null;
+      let bestScore = 0;
+      
+      for (const [id, existingB] of byId.entries()) {
+        if (areLikelySame(existingB, incomingB)) {
+          const incomingScore = getBuildingScore(incomingB);
+          const existingScore = getBuildingScore(existingB);
+          
+          // Prefer the building with higher score
+          if (incomingScore > existingScore || (incomingScore === existingScore && !processed.has(id))) {
+            fuzzyMatch = existingB;
+            bestScore = Math.max(incomingScore, existingScore);
+          }
+        }
+      }
+      
+      if (fuzzyMatch) {
+        // Merge into the existing building, preferring higher-scored properties
+        const existingB = fuzzyMatch;
+        const incomingScore = getBuildingScore(incomingB);
+        const existingScore = getBuildingScore(existingB);
+        
+        if (incomingScore >= existingScore) {
+          byId.set(existingB.id, { ...existingB, ...incomingB });
+        } else {
+          // Keep existing but merge in any missing properties
+          byId.set(existingB.id, { ...incomingB, ...existingB });
+        }
+        processed.add(existingB.id);
       } else {
-        byId.set(b.id, b);
+        // New building, add it
+        byId.set(incomingB.id, incomingB);
       }
     });
+    
     return Array.from(byId.values());
   };
 
@@ -706,6 +808,7 @@ function App() {
         building={selectedBuilding} 
         onClose={handleCloseDetails} 
         theme={theme}
+        userLocation={userLocation}
       />
 
       {/* The "N" Button - Bottom Left */}
@@ -720,25 +823,60 @@ function App() {
 
       {/* Intro / Empty State Overlay */}
       {firstLoad && !loading && (
-        <div className="absolute inset-0 bg-[#010E36]/80 z-30 flex items-center justify-center p-8">
-          <div className="max-w-lg w-full bg-[#282C55] p-12 shadow-xl relative rounded-[32px]">
-             <h1 className={`${fontFamily.heading} text-[#FDFEFF] mb-3 pt-2 pb-2`} style={{ fontSize: 'clamp(32px, 3.5vw, 4.5rem)', lineHeight: '1.1' }}>the Sexy Building Atlas</h1>
-             <p className={`${typography.body.sm} text-[#FDFEFF] mb-8`}>Global architecture finder</p>
+        <>
+          <style>{`
+            @media (max-width: 530px) {
+              .modal-title-line1 { font-size: 60px !important; }
+              .modal-title-A { font-size: 72px !important; }
+              .modal-title-isfor { font-size: 18px !important; margin-left: -8px !important; }
+              .modal-title-line2 { font-size: 60px !important; }
+              .modal-palace-img { display: none !important; }
+            }
+          `}</style>
+          <div className="absolute inset-0 bg-[#010E36]/80 z-30 flex items-center justify-center p-8 overflow-visible">
+            <div className="max-w-lg w-auto bg-[#282C55] px-12 py-8 shadow-xl relative rounded-[32px] overflow-visible max-[530px]:px-8 max-[530px]:py-6">
+               <div className="absolute right-12 top-[6.2rem] max-[530px]:hidden">
+                 <img 
+                   src="/images/palace.svg" 
+                   alt="Palace" 
+                   className="w-auto modal-palace-img" 
+                   style={{ height: 'calc(64px + 64px + 0.1em)' }} 
+                 />
+               </div>
+               <h1 className={`${fontFamily.heading} text-[#FDFEFF] mb-8 pt-2 pb-2 max-[530px]:mb-6`} style={{ lineHeight: '0.9' }}>
+                 <div className="modal-title-line1" style={{ fontSize: '96px' }}>
+                   <span className="modal-title-A font-bold" style={{ fontSize: '120px' }}>A</span> <span className="modal-title-isfor" style={{ fontSize: '24px', marginLeft: '-12px' }}>is for</span>
+                 </div>
+                 <div className="modal-title-line2" style={{ fontSize: '96px' }}>Atlas</div>
+               </h1>
              
-             <div className={`space-y-4 ${typography.body.default} text-[#FDFEFF] mb-10`}>
-               <p>The world is full of mediocre buildings. We don't care about those.</p>
-               <p>We track the brutal, the ominous, and the architectural manifestations of power.</p>
+             <div className={`space-y-4 ${typography.body.default} text-[#FDFEFF] mb-10 max-[530px]:mb-8`}>
+               <p style={{ fontWeight: 'bold' }}>Mediocre buildings need not apply.</p>
+               <p>This radar scans for the best of Art Deco, Brutalism, and Stalinist Gothic. Follow the deep red markers to find the ominous and the powerful.</p>
              </div>
 
              <button
                onClick={handleLocateMe}
-               className="w-full bg-[#d9d9d9] text-[#010E36] flex items-center justify-center group px-6 py-4 rounded-lg font-medium transition-all hover:opacity-90"
+               className="w-full bg-[#AA8BFF] text-[#010E36] flex items-center justify-center group px-6 py-4 rounded-lg font-bold transition-all hover:opacity-90"
              >
-                <Scan className="mr-2" size={18}/>
+                <Scan className="mr-2" size={18} strokeWidth={2.5}/>
                 Initialize Scan
              </button>
           </div>
+          
+          {/* Tracking status - below modal, side by side */}
+          <div className="absolute top-[calc(50%+280px)] left-1/2 transform -translate-x-1/2 flex items-center gap-8 z-30 max-[530px]:flex-col max-[530px]:gap-4 max-[530px]:w-full max-[530px]:px-4 max-[530px]:bottom-20 max-[530px]:top-auto max-[530px]:left-0 max-[530px]:transform-none">
+            <div className={`flex items-center gap-2 ${typography.body.sm} text-[#BAB2CF] max-[530px]:w-full max-[530px]:justify-center`}>
+              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
+              <span>Architecture tracking active</span>
+            </div>
+            <div className={`flex items-center gap-2 ${typography.body.sm} text-[#BAB2CF] max-[530px]:w-full max-[530px]:justify-center`}>
+              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
+              <span>Nick tracking active</span>
+            </div>
+          </div>
         </div>
+        </>
       )}
 
       {/* Error Toast */}
@@ -752,6 +890,11 @@ function App() {
           <button onClick={() => setError(null)} className={`ml-4 ${colors.text.muted} hover:opacity-80`}><Info size={16}/></button>
         </div>
       )}
+
+      {/* Footer text - always visible at bottom center */}
+      <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center">
+        <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
+      </div>
 
       {/* Branding overlay (bottom right) - Removed for clean aesthetic */}
     </div>

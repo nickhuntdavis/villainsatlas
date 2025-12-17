@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Locate, Crosshair, MapPin } from 'lucide-react';
+import { Search, Loader2, Locate, Crosshair, Binoculars } from 'lucide-react';
 import { SurfaceCard, StatusStrip } from '../ui/atoms';
 import { typography, getThemeColors } from '../ui/theme';
 
@@ -69,13 +69,26 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         : 'md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto'
     }`}>
       <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`}>
-        <div className={`relative flex items-center bg-[#282C55] rounded-[16px] pt-3 pb-3 pr-3 pl-6 overflow-hidden transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`}>
+        <div className={`relative flex items-center bg-[#282C55] rounded-[16px] pt-3 pb-3 pl-3 overflow-hidden transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`} style={{ filter: 'drop-shadow(0 6px 18px #020716)', paddingRight: '24px' }}>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="bg-[#AA8BFF] text-[#010E36] px-3 py-2 rounded-[4px] flex items-center justify-center transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ fontSize: '20px' }}
+          >
+            {isLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <Search size={18} strokeWidth={2.5} />
+            )}
+          </button>
+          
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Enter sector or city..."
-            className="flex-1 bg-transparent border-none px-0 py-0 text-white focus:outline-none min-w-0 placeholder:text-white"
+            placeholder="Search"
+            className="flex-1 bg-transparent border-none px-3 py-0 text-white focus:outline-none min-w-0 placeholder:text-white"
             disabled={isLoading}
             style={{ fontSize: '16px' }}
           />
@@ -88,18 +101,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             style={{ fontSize: '16px' }}
           >
             <Locate size={16} className="text-[#CDBAFF]" />
-            <span className="hidden lg:inline">Me</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={onSearchArea}
-            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
-            title="Scan current area"
-            style={{ fontSize: '16px' }}
-          >
-            <MapPin size={16} className="text-[#CDBAFF]" />
-            <span className="hidden lg:inline">Here</span>
+            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }}>Me</span>
           </button>
           
           <button
@@ -110,20 +112,18 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             style={{ fontSize: '16px' }}
           >
             <Crosshair size={16} className="text-[#CDBAFF]" />
-            <span className="hidden lg:inline">Nearest</span>
+            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }}>Nearest</span>
           </button>
-
+          
           <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-[#AA8BFF] text-[#010E36] px-3 py-2 rounded-[4px] flex items-center justify-center transition-all hover:opacity-90 disabled:opacity-50 ml-6"
-            style={{ fontSize: '20px' }}
+            type="button"
+            onClick={onSearchArea}
+            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
+            title="Scan current area"
+            style={{ fontSize: '16px' }}
           >
-            {isLoading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Search size={18} strokeWidth={2.5} />
-            )}
+            <Binoculars size={16} className="text-[#CDBAFF]" />
+            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }}>Scan here</span>
           </button>
         </div>
       </form>

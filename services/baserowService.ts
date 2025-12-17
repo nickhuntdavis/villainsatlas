@@ -266,16 +266,60 @@ export const saveBuildingToBaserow = async (building: Building): Promise<Buildin
   }
 };
 
-// Check if building already exists and return the Baserow row ID if found
+// Helper to normalize names for fuzzy matching
+const normalizeNameForMatch = (name: string): string => {
+  return name.toLowerCase()
+    .replace(/[^\w\s]/g, '') // Remove punctuation
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+};
+
+// Helper to calculate similarity between two normalized names
+const nameSimilarity = (name1: string, name2: string): number => {
+  const norm1 = normalizeNameForMatch(name1);
+  const norm2 = normalizeNameForMatch(name2);
+  
+  // Exact match after normalization
+  if (norm1 === norm2) return 1.0;
+  
+  // One contains the other (high similarity)
+  if (norm1.includes(norm2) || norm2.includes(norm1)) {
+    const shorter = Math.min(norm1.length, norm2.length);
+    const longer = Math.max(norm1.length, norm2.length);
+    return shorter / longer;
+  }
+  
+  // Calculate word overlap
+  const words1 = new Set(norm1.split(' ').filter(w => w.length > 2));
+  const words2 = new Set(norm2.split(' ').filter(w => w.length > 2));
+  if (words1.size === 0 || words2.size === 0) return 0;
+  
+  const intersection = [...words1].filter(w => words2.has(w)).length;
+  const union = new Set([...words1, ...words2]).size;
+  return intersection / union;
+};
+
+// Check if building already exists and return the Baserow row ID if found (with fuzzy matching)
 export const findExistingBuilding = async (building: Building): Promise<{ exists: boolean; rowId?: number }> => {
   try {
-    // Helper to normalize names for comparison (ignore case and punctuation)
-    const normalizeName = (name: string) => name.toLowerCase().replace(/[^\w\s]/g, '').trim();
-
     const nearby = await fetchBuildingsNearLocation(building.coordinates, 1000); // 1km radius
-    const existing = nearby.find(
-      (b) => normalizeName(b.name) === normalizeName(building.name)
+    
+    // First try exact name match
+    let existing = nearby.find(
+      (b) => normalizeNameForMatch(b.name) === normalizeNameForMatch(building.name)
     );
+    
+    // If no exact match, try fuzzy matching
+    if (!existing) {
+      existing = nearby.find((b) => {
+        const nameSim = nameSimilarity(b.name, building.name);
+        if (nameSim < 0.6) return false; // Names too different
+        
+        // Also check if coordinates are close (within 500m)
+        const distance = getDistance(b.coordinates, building.coordinates);
+        return distance < 500;
+      });
+    }
     
     if (existing) {
       // Extract Baserow row ID from the building ID (format: "baserow-{id}")
