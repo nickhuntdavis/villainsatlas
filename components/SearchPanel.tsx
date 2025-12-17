@@ -36,7 +36,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     'querying evil database...',
     'parsing dark deco...',
     'reticulating splines...',
-    'remind nastya that nick loves her'
+    'Remind Nastya how much Nick loves her...'
   ];
   
   useEffect(() => {

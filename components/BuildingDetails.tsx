@@ -60,14 +60,7 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
               }}
             />
           </div>
-        ) : (
-          <div
-            className="w-full h-full flex flex-col items-center justify-center bg-[#020716]"
-          >
-             <ImageOff size={32} className="mb-2 opacity-50 text-white" />
-             <span className={`${typography.body.sm} opacity-50 text-white`}>Visuals Classified</span>
-          </div>
-        )}
+        ) : null}
         
         <button
           onClick={onClose}
@@ -124,9 +117,13 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
               .trim();
 
             // Get the best Google Maps URL - prioritize place_id + name, then name+location search, then coordinates
+            // Special case: "Nick" always uses coordinates, not POI search
             let mapsUrl: string | undefined = undefined;
 
-            if (building.googlePlaceId) {
+            if (building.name?.toLowerCase() === 'nick' && building.coordinates) {
+              // For Nick, always use coordinates directly
+              mapsUrl = `https://www.google.com/maps?q=${building.coordinates.lat},${building.coordinates.lng}`;
+            } else if (building.googlePlaceId) {
               // Best case: We have a place_id for the actual POI - use it with the name
               const cleanPlaceId = building.googlePlaceId.replace(/^places\//, '').trim();
               const placeName = encodeURIComponent(building.name);

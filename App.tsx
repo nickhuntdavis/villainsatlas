@@ -6,7 +6,7 @@ import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
-import { AlertTriangle, Info, Heart, Scan, SunMedium, Moon } from 'lucide-react';
+import { AlertTriangle, Info, Heart, Scan } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
 import { typography, getThemeColors, fontFamily } from './ui/theme';
 
@@ -42,9 +42,6 @@ function App() {
     }
   }, [theme]);
 
-  const handleToggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
 
   // Merge helper to keep markers persistent without duplicates
   const mergeBuildings = (existing: Building[], incoming: Building[]): Building[] => {
@@ -88,6 +85,16 @@ function App() {
     },
     [allBaserowBuildings]
   );
+
+  // Clear status message shortly after search completes
+  useEffect(() => {
+    if (!loading && searchStatus === 'idle' && statusMessage) {
+      const timer = setTimeout(() => {
+        setStatusMessage(null);
+      }, 1000); // Show briefly then clear
+      return () => clearTimeout(timer);
+    }
+  }, [loading, searchStatus, statusMessage]);
 
   // Initial load of all Baserow buildings for caching and display on map
   useEffect(() => {
@@ -675,13 +682,22 @@ function App() {
         />
         {/* Map color overlay - only in dark mode */}
         {theme === 'dark' && (
-          <div 
-            className="absolute inset-0 pointer-events-none z-10"
-            style={{ 
-              backgroundColor: '#030919',
-              mixBlendMode: 'exclusion'
-            }}
-          />
+          <>
+            <div 
+              className="absolute inset-0 pointer-events-none z-10"
+              style={{ 
+                backgroundColor: '#030919',
+                mixBlendMode: 'exclusion'
+              }}
+            />
+            <div 
+              className="absolute inset-0 pointer-events-none z-10"
+              style={{ 
+                backgroundColor: '#010E36',
+                opacity: 0.25
+              }}
+            />
+          </>
         )}
       </div>
 
@@ -695,20 +711,12 @@ function App() {
       {/* The "N" Button - Bottom Left */}
       <button
         onClick={handleNButton}
-        className={`absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 ${colors.background.elevated} ${colors.border.default} ${colors.text.primary} ${colors.accent.primary} transition-all shadow-md flex items-center justify-center group border rounded-full hover:scale-105`}
+        className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 transition-all flex items-center justify-center group hover:scale-105"
         title="The Architect"
       >
-        <Heart size={20} className="group-hover:scale-110 transition-all fill-current" />
+        <Heart size={20} className="group-hover:scale-110 transition-all fill-current text-red-500" />
       </button>
 
-      {/* Theme Toggle - Bottom Left, next to N button */}
-      <button
-        onClick={handleToggleTheme}
-        className={`absolute bottom-4 md:bottom-6 left-[4.5rem] md:left-[5.5rem] z-10 w-10 h-10 ${colors.background.elevated} ${colors.border.default} ${colors.text.muted} transition-all shadow-md flex items-center justify-center group border rounded-full hover:opacity-80`}
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {theme === 'dark' ? <SunMedium size={16} /> : <Moon size={16} />}
-      </button>
 
       {/* Intro / Empty State Overlay */}
       {firstLoad && !loading && (
