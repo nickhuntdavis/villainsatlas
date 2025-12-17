@@ -163,31 +163,64 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     // Fallback for possible Node or non-Vite environments
     (process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
 
+  // Helper to find place ID using Places API text search if not already set
+  const findPlaceId = async (building: Building): Promise<string | undefined> => {
+    if (!mapsApiKey || building.googlePlaceId) {
+      return building.googlePlaceId;
+    }
+
+    try {
+      // Try to find place ID using text search
+      const searchQuery = `${building.name}, ${building.location || building.city || ''}`.trim();
+      const searchUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(searchQuery)}&inputtype=textquery&fields=place_id&key=${mapsApiKey}`;
+      
+      const res = await fetch(searchUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'OK' && data.candidates && data.candidates.length > 0) {
+          return data.candidates[0].place_id;
+        }
+      }
+    } catch (err) {
+      console.warn(`Error finding place ID for "${building.name}":`, err);
+    }
+    return undefined;
+  };
+
   const enrichWithPlaces = async (building: Building): Promise<Building> => {
-    if (!mapsApiKey || !building.googlePlaceId) {
+    if (!mapsApiKey) {
+      return building;
+    }
+
+    // Try to find place ID if not already set
+    const placeId = await findPlaceId(building);
+    if (!placeId) {
+      console.warn(`No place ID found for "${building.name}" - skipping Places enrichment`);
       return building;
     }
 
     try {
       const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
-        building.googlePlaceId
+        placeId
       )}&fields=place_id,url,photos,types&key=${mapsApiKey}`;
 
       const res = await fetch(detailsUrl);
       if (!res.ok) {
         console.warn(
-          `Places Details error for ${building.googlePlaceId}: ${res.status} ${res.statusText}`
+          `Places Details error for ${placeId}: ${res.status} ${res.statusText}`
         );
-        return building;
+        // Still return building with the found place ID
+        return { ...building, googlePlaceId: placeId };
       }
 
       const data = await res.json();
       if (data.status !== "OK" || !data.result) {
         console.warn(
-          `Places Details non-OK for ${building.googlePlaceId}:`,
+          `Places Details non-OK for ${placeId}:`,
           data.status
         );
-        return building;
+        // Still return building with the found place ID
+        return { ...building, googlePlaceId: placeId };
       }
 
       const result = data.result;
@@ -392,20 +425,32 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     });
 
     // Save new buildings to Baserow if they don't already exist (async, don't wait)
-    enrichedBuildings.forEach(async (building) => {
-      try {
-        const existing = await findExistingBuilding(building);
-        if (!existing.exists) {
-          // Create new entry only when there isn't already a Baserow row
-          await saveBuildingToBaserow(building);
-          console.log(`Saved "${building.name}" to Baserow`);
-        } else {
-          console.log(`Skipped saving "${building.name}" – already exists in Baserow`);
+    // Use Promise.allSettled to handle all saves without blocking, but track results
+    Promise.allSettled(
+      enrichedBuildings.map(async (building) => {
+        try {
+          const existing = await findExistingBuilding(building);
+          if (!existing.exists) {
+            // Create new entry only when there isn't already a Baserow row
+            const savedBuilding = await saveBuildingToBaserow(building);
+            console.log(`Saved "${building.name}" to Baserow with ID: ${savedBuilding.id}`);
+            return savedBuilding;
+          } else {
+            console.log(`Skipped saving "${building.name}" – already exists in Baserow`);
+            return null;
+          }
+        } catch (error) {
+          console.warn(`Failed to save/update "${building.name}" in Baserow:`, error);
+          // Don't throw - we still want to return the buildings even if save fails
+          return null;
         }
-  } catch (error) {
-        console.warn(`Failed to save/update "${building.name}" in Baserow:`, error);
-        // Don't throw - we still want to return the buildings even if save fails
-      }
+      })
+    ).then((results) => {
+      // Log summary of save results
+      const saved = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+      const skipped = results.filter(r => r.status === 'fulfilled' && r.value === null).length;
+      console.log(`Baserow save summary: ${saved} saved, ${skipped} skipped, ${failed} failed`);
     });
 
     return enrichedBuildings;

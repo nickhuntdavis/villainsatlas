@@ -189,6 +189,14 @@ export const fetchBuildingByName = async (name: string): Promise<Building | null
 // Save a building to Baserow
 export const saveBuildingToBaserow = async (building: Building): Promise<Building> => {
   try {
+    // Validate coordinates
+    if (!building.coordinates || 
+        typeof building.coordinates.lat !== 'number' || 
+        typeof building.coordinates.lng !== 'number' ||
+        isNaN(building.coordinates.lat) || 
+        isNaN(building.coordinates.lng)) {
+      throw new Error(`Invalid coordinates for building "${building.name}": ${JSON.stringify(building.coordinates)}`);
+    }
     // Use city/country from building if available, otherwise try to parse from location
     let city = (building as BuildingForSave).city || "";
     let country = (building as BuildingForSave).country || "";
@@ -218,7 +226,7 @@ export const saveBuildingToBaserow = async (building: Building): Promise<Buildin
       country: country || "",
       lat: building.coordinates.lat.toString(),
       lng: building.coordinates.lng.toString(),
-      google_place_id: (building as BuildingForSave).googlePlaceId || "",
+      google_place_id: building.googlePlaceId || (building as BuildingForSave).googlePlaceId || "",
       Gmaps_url: gmapsUrl,
       image_url: building.imageUrl || "",
       notes: building.description || "",
@@ -227,6 +235,14 @@ export const saveBuildingToBaserow = async (building: Building): Promise<Buildin
       architect: building.architect || "",
       is_prioritized: building.isPrioritized || false,
     };
+
+    // Log what we're saving for debugging
+    console.log(`Saving "${building.name}" to Baserow:`, {
+      hasPlaceId: !!payload.google_place_id,
+      hasImage: !!payload.image_url,
+      hasGmapsUrl: !!payload.Gmaps_url,
+      coordinates: `${payload.lat}, ${payload.lng}`,
+    });
 
     const response = await fetch(
       `${BASEROW_API_BASE}/${TABLE_ID}/?user_field_names=true`,
