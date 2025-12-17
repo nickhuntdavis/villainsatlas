@@ -3,8 +3,8 @@ import { Map as AtlasMap } from './components/Map';
 import { BuildingDetails } from './components/BuildingDetails';
 import { SearchPanel } from './components/SearchPanel';
 import { Building, Coordinates } from './types';
-import { fetchLairs, geocodeLocation } from './services/geminiService';
-import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName } from './services/baserowService';
+import { fetchLairs, geocodeLocation, fetchImageForBuilding } from './services/geminiService';
+import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
@@ -165,9 +165,11 @@ function App() {
   // Helper to get nearby Baserow buildings, preferring in-memory cache
   const getBaserowBuildingsNear = useCallback(
     async (center: Coordinates, radiusMeters: number) => {
+      let results: Building[] = [];
+      
       if (allBaserowBuildings.length > 0) {
         // Filter by distance and validate coordinates
-        return allBaserowBuildings.filter((b) => {
+        results = allBaserowBuildings.filter((b) => {
           // Skip buildings with invalid coordinates
           if (!b.coordinates || 
               isNaN(b.coordinates.lat) || 
@@ -178,12 +180,37 @@ function App() {
           const distance = getDistance(center, b.coordinates);
           return distance <= radiusMeters;
         });
+      } else {
+        const fresh = await fetchBuildingsNearLocation(center, radiusMeters);
+        if (fresh.length > 0) {
+          setAllBaserowBuildings((prev) => mergeBuildings(prev, fresh));
+        }
+        results = fresh;
       }
-      const fresh = await fetchBuildingsNearLocation(center, radiusMeters);
-      if (fresh.length > 0) {
-        setAllBaserowBuildings((prev) => mergeBuildings(prev, fresh));
+      
+      // Enrich buildings with images if they have google_place_id but no imageUrl
+      // Only do this for a reasonable number of buildings to avoid API limits (limit to first 20)
+      const buildingsNeedingImages = results.filter(b => b.googlePlaceId && !b.imageUrl).slice(0, 20);
+      if (buildingsNeedingImages.length > 0) {
+        const enrichedBuildings = await Promise.all(
+          buildingsNeedingImages.map(b => fetchImageForBuilding(b))
+        );
+        
+        // Update results with enriched versions
+        const enrichedMap = new Map(enrichedBuildings.map(b => [b.id, b]));
+        results = results.map(b => enrichedMap.get(b.id) || b);
+        
+        // Update cache with enriched buildings
+        if (allBaserowBuildings.length > 0) {
+          setAllBaserowBuildings((prev) => {
+            const updated = new Map(prev.map(b => [b.id, b]));
+            enrichedBuildings.forEach(b => updated.set(b.id, b));
+            return Array.from(updated.values());
+          });
+        }
       }
-      return fresh;
+      
+      return results;
     },
     [allBaserowBuildings]
   );
@@ -214,9 +241,51 @@ function App() {
         
         // Display buildings within initial map view (50km radius from default center)
         const initialRadius = 50000; // 50km
-        const buildingsInView = validBuildings.filter((b) => 
+        let buildingsInView = validBuildings.filter((b) => 
           getDistance(DEFAULT_COORDINATES, b.coordinates) <= initialRadius
         );
+        
+        // Enrich buildings with images if they have google_place_id but no imageUrl
+        // Do this in batches to avoid overwhelming the API (limit to first 20)
+        const buildingsNeedingImages = buildingsInView.filter(b => b.googlePlaceId && !b.imageUrl).slice(0, 20);
+        if (buildingsNeedingImages.length > 0) {
+          console.log(`🖼️ Fetching images for ${buildingsNeedingImages.length} buildings with place IDs...`);
+          const enrichedBuildings = await Promise.all(
+            buildingsNeedingImages.map(b => fetchImageForBuilding(b))
+          );
+          
+          // Save enriched images back to Baserow for permanent storage
+          for (const enrichedBuilding of enrichedBuildings) {
+            if (enrichedBuilding.imageUrl) {
+              const originalBuilding = buildingsNeedingImages.find(b => b.id === enrichedBuilding.id);
+              if (originalBuilding && !originalBuilding.imageUrl) {
+                // Extract row ID from building.id (format: "baserow-{id}")
+                const rowIdMatch = enrichedBuilding.id.match(/^baserow-(\d+)$/);
+                if (rowIdMatch) {
+                  const rowId = parseInt(rowIdMatch[1], 10);
+                  try {
+                    await updateBuildingInBaserow(rowId, enrichedBuilding);
+                    console.log(`💾 Saved image URL to Baserow for "${enrichedBuilding.name}"`);
+                  } catch (err) {
+                    console.warn(`Failed to save image URL to Baserow for "${enrichedBuilding.name}":`, err);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Update buildingsInView with enriched versions
+          const enrichedMap = new Map(enrichedBuildings.map(b => [b.id, b]));
+          buildingsInView = buildingsInView.map(b => enrichedMap.get(b.id) || b);
+          
+          // Update cache with enriched buildings
+          setAllBaserowBuildings((prev) => {
+            const updated = new Map(prev.map(b => [b.id, b]));
+            enrichedBuildings.forEach(b => updated.set(b.id, b));
+            return Array.from(updated.values());
+          });
+        }
+        
         setBuildings(buildingsInView);
       } catch (err) {
         console.error("Error loading initial Baserow buildings:", err);
@@ -292,6 +361,40 @@ function App() {
                  console.warn("Gemini search failed, using Baserow results only:", geminiErr);
                }
              }
+           }
+           
+           // Enrich Gemini results with images if they have place IDs but no imageUrl
+           // This ensures images are fetched even if enrichWithPlaces didn't work initially
+           const geminiResultsNeedingImages = geminiResults.filter(b => b.googlePlaceId && !b.imageUrl);
+           if (geminiResultsNeedingImages.length > 0) {
+             console.log(`🖼️ Enriching ${geminiResultsNeedingImages.length} Gemini results with images...`);
+             const enrichedGeminiResults = await Promise.all(
+               geminiResultsNeedingImages.map(b => fetchImageForBuilding(b))
+             );
+             
+             // Save enriched images back to Baserow for buildings that already exist in Baserow
+             for (const enrichedBuilding of enrichedGeminiResults) {
+               if (enrichedBuilding.imageUrl) {
+                 const originalBuilding = geminiResultsNeedingImages.find(b => b.id === enrichedBuilding.id);
+                 if (originalBuilding && !originalBuilding.imageUrl) {
+                   // Only save if building already exists in Baserow (has baserow-{id} format)
+                   const rowIdMatch = enrichedBuilding.id.match(/^baserow-(\d+)$/);
+                   if (rowIdMatch) {
+                     const rowId = parseInt(rowIdMatch[1], 10);
+                     try {
+                       await updateBuildingInBaserow(rowId, enrichedBuilding);
+                       console.log(`💾 Saved image URL to Baserow for "${enrichedBuilding.name}"`);
+                     } catch (err) {
+                       console.warn(`Failed to save image URL to Baserow for "${enrichedBuilding.name}":`, err);
+                     }
+                   }
+                 }
+               }
+             }
+             
+             // Update geminiResults with enriched versions
+             const enrichedMap = new Map(enrichedGeminiResults.map(b => [b.id, b]));
+             geminiResults = geminiResults.map(b => enrichedMap.get(b.id) || b);
            }
            
            // Merge results
@@ -539,6 +642,39 @@ function App() {
         }
       }
       
+      // Enrich Gemini results with images if they have place IDs but no imageUrl
+      const geminiResultsNeedingImages = geminiResults.filter(b => b.googlePlaceId && !b.imageUrl);
+      if (geminiResultsNeedingImages.length > 0) {
+        console.log(`🖼️ Enriching ${geminiResultsNeedingImages.length} Gemini results with images...`);
+        const enrichedGeminiResults = await Promise.all(
+          geminiResultsNeedingImages.map(b => fetchImageForBuilding(b))
+        );
+        
+        // Save enriched images back to Baserow for buildings that already exist in Baserow
+        for (const enrichedBuilding of enrichedGeminiResults) {
+          if (enrichedBuilding.imageUrl) {
+            const originalBuilding = geminiResultsNeedingImages.find(b => b.id === enrichedBuilding.id);
+            if (originalBuilding && !originalBuilding.imageUrl) {
+              // Only save if building already exists in Baserow (has baserow-{id} format)
+              const rowIdMatch = enrichedBuilding.id.match(/^baserow-(\d+)$/);
+              if (rowIdMatch) {
+                const rowId = parseInt(rowIdMatch[1], 10);
+                try {
+                  await updateBuildingInBaserow(rowId, enrichedBuilding);
+                  console.log(`💾 Saved image URL to Baserow for "${enrichedBuilding.name}"`);
+                } catch (err) {
+                  console.warn(`Failed to save image URL to Baserow for "${enrichedBuilding.name}":`, err);
+                }
+              }
+            }
+          }
+        }
+        
+        // Update geminiResults with enriched versions
+        const enrichedMap = new Map(enrichedGeminiResults.map(b => [b.id, b]));
+        geminiResults = geminiResults.map(b => enrichedMap.get(b.id) || b);
+      }
+      
       // Merge results
       const results = mergeBuildings(baserowResults, geminiResults);
       
@@ -663,6 +799,39 @@ function App() {
              console.warn("Gemini search failed, using Baserow results only:", geminiErr);
            }
          }
+       }
+       
+       // Enrich Gemini results with images if they have place IDs but no imageUrl
+       const geminiResultsNeedingImages = geminiResults.filter(b => b.googlePlaceId && !b.imageUrl);
+       if (geminiResultsNeedingImages.length > 0) {
+         console.log(`🖼️ Enriching ${geminiResultsNeedingImages.length} Gemini results with images...`);
+         const enrichedGeminiResults = await Promise.all(
+           geminiResultsNeedingImages.map(b => fetchImageForBuilding(b))
+         );
+         
+         // Save enriched images back to Baserow for buildings that already exist in Baserow
+         for (const enrichedBuilding of enrichedGeminiResults) {
+           if (enrichedBuilding.imageUrl) {
+             const originalBuilding = geminiResultsNeedingImages.find(b => b.id === enrichedBuilding.id);
+             if (originalBuilding && !originalBuilding.imageUrl) {
+               // Only save if building already exists in Baserow (has baserow-{id} format)
+               const rowIdMatch = enrichedBuilding.id.match(/^baserow-(\d+)$/);
+               if (rowIdMatch) {
+                 const rowId = parseInt(rowIdMatch[1], 10);
+                 try {
+                   await updateBuildingInBaserow(rowId, enrichedBuilding);
+                   console.log(`💾 Saved image URL to Baserow for "${enrichedBuilding.name}"`);
+                 } catch (err) {
+                   console.warn(`Failed to save image URL to Baserow for "${enrichedBuilding.name}":`, err);
+                 }
+               }
+             }
+           }
+         }
+         
+         // Update geminiResults with enriched versions
+         const enrichedMap = new Map(enrichedGeminiResults.map(b => [b.id, b]));
+         geminiResults = geminiResults.map(b => enrichedMap.get(b.id) || b);
        }
        
        // Merge results

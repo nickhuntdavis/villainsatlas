@@ -244,12 +244,17 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
           updated.imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(
             photoRef
           )}&key=${mapsApiKey}`;
-          console.log(`✅ Set Google Places image for "${building.name}"`);
+          console.log(`✅ Set Google Places image for "${building.name}" (place_id: ${placeId})`);
         } else {
-          console.warn(`⚠️ No photo_reference found in photos array for "${building.name}"`);
+          console.warn(`⚠️ No photo_reference found in photos array for "${building.name}" (place_id: ${placeId})`);
         }
       } else {
-        console.warn(`⚠️ No photos found in Places API result for "${building.name}"`);
+        console.warn(`⚠️ No photos found in Places API result for "${building.name}" (place_id: ${placeId})`);
+      }
+      
+      // Log if building still has no image after enrichment attempt
+      if (!updated.imageUrl && placeId) {
+        console.warn(`⚠️ Building "${building.name}" saved without image despite having place_id: ${placeId}. Will be enriched on next load.`);
       }
 
       return updated;
@@ -512,5 +517,58 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     }
     
     throw error;
+  }
+};
+
+// Export function to fetch image for a building that has google_place_id but no imageUrl
+export const fetchImageForBuilding = async (building: Building): Promise<Building> => {
+  // Only fetch if building has place ID but no image
+  if (!building.googlePlaceId || building.imageUrl) {
+    return building;
+  }
+
+  const mapsApiKey =
+    (typeof import.meta !== "undefined" &&
+      ((import.meta as any).env?.GOOGLE_MAPS_API_KEY ||
+        (import.meta as any).env?.REACT_APP_GOOGLE_MAPS_API_KEY)) ||
+    (process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
+
+  if (!mapsApiKey) {
+    return building;
+  }
+
+  try {
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+      building.googlePlaceId
+    )}&fields=photos&key=${mapsApiKey}`;
+
+    const res = await fetch(detailsUrl);
+    if (!res.ok) {
+      return building;
+    }
+
+    const data = await res.json();
+    if (data.status !== "OK" || !data.result) {
+      return building;
+    }
+
+    const result = data.result;
+
+    // Fetch image from Google Places Photos if available
+    if (Array.isArray(result.photos) && result.photos.length > 0) {
+      const photoRef = result.photos[0].photo_reference;
+      if (photoRef) {
+        const imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(
+          photoRef
+        )}&key=${mapsApiKey}`;
+        console.log(`✅ Fetched Google Places image for "${building.name}"`);
+        return { ...building, imageUrl };
+      }
+    }
+
+    return building;
+  } catch (err) {
+    console.warn(`Error fetching image for "${building.name}":`, err);
+    return building;
   }
 };
