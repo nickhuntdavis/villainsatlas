@@ -31,12 +31,12 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   
   // Rotating loading messages
   const loadingMessages = [
-    'searching evil archives...',
+    'searching sexy building archives...',
     'searching dark web...',
     'querying evil database...',
     'parsing dark deco...',
     'reticulating splines...',
-    'Remind Nastya how much Nick loves her...'
+    'reminding Nastya that Nick loves her...'
   ];
   
   useEffect(() => {
