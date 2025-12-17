@@ -119,7 +119,7 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
           </div>
         )}
 
-        <h2 className={`${fontFamily.heading} mb-4 break-words text-white`} style={{ fontSize: 'clamp(32px, 3.5vw, 4.5rem)', lineHeight: '1.1' }}>
+        <h2 className={`${fontFamily.heading} mb-4 break-words text-white`} style={{ fontSize: 'clamp(32px, 3.5vw, 56px)', lineHeight: '1.1' }}>
           {building.name}
         </h2>
 

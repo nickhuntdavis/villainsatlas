@@ -410,3 +410,113 @@ export const buildingExists = async (building: Building): Promise<boolean> => {
   return result.exists;
 };
 
+// Dedupe function that can be called from the frontend
+// Returns list of deleted row IDs that should be blacklisted
+export const dedupeBaserowBuildings = async (): Promise<number[]> => {
+  try {
+    const allBuildings = await fetchAllBuildings();
+    console.log(`🔍 Found ${allBuildings.length} total buildings for dedupe check`);
+
+    // Group duplicates using fuzzy matching
+    const duplicateGroups: Building[][] = [];
+    const processed = new Set<string>();
+
+    for (let i = 0; i < allBuildings.length; i++) {
+      if (processed.has(allBuildings[i].id)) continue;
+
+      const group = [allBuildings[i]];
+      processed.add(allBuildings[i].id);
+
+      for (let j = i + 1; j < allBuildings.length; j++) {
+        if (processed.has(allBuildings[j].id)) continue;
+
+        // Check if buildings are likely the same
+        const nameSim = nameSimilarity(allBuildings[i].name, allBuildings[j].name);
+        if (nameSim >= 0.6) {
+          const distance = getDistance(allBuildings[i].coordinates, allBuildings[j].coordinates);
+          if (distance < 500) {
+            group.push(allBuildings[j]);
+            processed.add(allBuildings[j].id);
+          }
+        }
+      }
+
+      if (group.length > 1) {
+        duplicateGroups.push(group);
+      }
+    }
+
+    console.log(`📋 Found ${duplicateGroups.length} duplicate groups`);
+
+    if (duplicateGroups.length === 0) {
+      return [];
+    }
+
+    const deletedIds: number[] = [];
+
+    for (const group of duplicateGroups) {
+      // Score each building in the group
+      const scored = group.map((b) => ({
+        building: b,
+        score: getBuildingScore(b),
+      }));
+
+      // Sort by score (highest first)
+      scored.sort((a, b) => b.score - a.score);
+
+      const keep = scored[0].building;
+      const toDelete = scored.slice(1);
+
+      for (const item of toDelete) {
+        // Extract Baserow row ID from the building ID (format: "baserow-{id}")
+        const rowIdMatch = item.building.id.match(/^baserow-(\d+)$/);
+        if (rowIdMatch) {
+          const rowId = parseInt(rowIdMatch[1], 10);
+          try {
+            // Delete from Baserow
+            const deleteUrl = `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`;
+            const deleteRes = await fetch(deleteUrl, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Token ${API_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+            });
+
+            if (deleteRes.ok) {
+              deletedIds.push(rowId);
+              console.log(`🗑️ Deleted duplicate: "${item.building.name}" (row ID: ${rowId})`);
+              // Small delay to avoid rate limits
+              await new Promise(resolve => setTimeout(resolve, 300));
+            } else {
+              console.error(`❌ Failed to delete row ${rowId}: ${deleteRes.status}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error deleting row ${rowId}:`, error);
+          }
+        }
+      }
+    }
+
+    console.log(`✅ Dedupe complete. Deleted ${deletedIds.length} duplicates.`);
+    return deletedIds;
+  } catch (error) {
+    console.error("Error during dedupe:", error);
+    throw error;
+  }
+};
+
+// Helper to score building quality (prefer ones with Google Place ID and images)
+const getBuildingScore = (b: Building): number => {
+  let score = 0;
+  if (b.googlePlaceId) score += 10;
+  if (b.imageUrl) score += 5;
+  if (b.gmapsUrl) score += 2;
+  if (b.description) score += 1;
+  // Prefer buildings with more complete data
+  if (b.city) score += 0.5;
+  if (b.country) score += 0.5;
+  if (b.location) score += 0.5;
+  return score;
+};
+

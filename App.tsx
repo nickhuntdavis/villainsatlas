@@ -2,9 +2,10 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Map as AtlasMap } from './components/Map';
 import { BuildingDetails } from './components/BuildingDetails';
 import { SearchPanel } from './components/SearchPanel';
+import { FallingHearts } from './components/FallingHearts';
 import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding } from './services/geminiService';
-import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow } from './services/baserowService';
+import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
@@ -28,9 +29,30 @@ function App() {
     }
     return 'dark';
   });
+  const [showFallingHearts, setShowFallingHearts] = useState(false);
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const [blacklistedBuildingIds, setBlacklistedBuildingIds] = useState<Set<number>>(() => {
+    // Load blacklisted IDs from localStorage
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('evil-atlas-blacklisted-ids');
+      if (stored) {
+        try {
+          const ids = JSON.parse(stored) as number[];
+          return new Set(ids);
+        } catch (e) {
+          console.error('Failed to parse blacklisted IDs:', e);
+        }
+      }
+    }
+    return new Set<number>();
+  });
   
   // Ref to store the map bounds getter function
   const getMapBoundsRef = useRef<(() => { north: number; south: number; east: number; west: number } | null) | null>(null);
+  
+  // Ref for dedupe button double-click detection
+  const dedupeClickCountRef = useRef(0);
+  const dedupeClickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Persist theme and expose as data attribute for potential global styling
   useEffect(() => {
@@ -162,6 +184,18 @@ function App() {
     return Array.from(byId.values());
   };
 
+  // Helper to filter out blacklisted buildings
+  const filterBlacklistedBuildings = useCallback((buildings: Building[]): Building[] => {
+    return buildings.filter((b) => {
+      const rowIdMatch = b.id.match(/^baserow-(\d+)$/);
+      if (rowIdMatch) {
+        const rowId = parseInt(rowIdMatch[1], 10);
+        return !blacklistedBuildingIds.has(rowId);
+      }
+      return true; // Keep non-Baserow buildings
+    });
+  }, [blacklistedBuildingIds]);
+
   // Helper to get nearby Baserow buildings, preferring in-memory cache
   const getBaserowBuildingsNear = useCallback(
     async (center: Coordinates, radiusMeters: number) => {
@@ -188,6 +222,9 @@ function App() {
         results = fresh;
       }
       
+      // Filter out blacklisted buildings
+      results = filterBlacklistedBuildings(results);
+      
       // Enrich buildings with images if they have google_place_id but no imageUrl
       // Only do this for a reasonable number of buildings to avoid API limits (limit to first 20)
       const buildingsNeedingImages = results.filter(b => b.googlePlaceId && !b.imageUrl).slice(0, 20);
@@ -212,7 +249,7 @@ function App() {
       
       return results;
     },
-    [allBaserowBuildings]
+    [allBaserowBuildings, filterBlacklistedBuildings]
   );
 
   // Clear status message shortly after search completes
@@ -241,9 +278,19 @@ function App() {
         
         // Display buildings within initial map view (50km radius from default center)
         const initialRadius = 50000; // 50km
-        let buildingsInView = validBuildings.filter((b) => 
-          getDistance(DEFAULT_COORDINATES, b.coordinates) <= initialRadius
-        );
+        let buildingsInView = validBuildings.filter((b) => {
+          // Filter by distance
+          const withinRadius = getDistance(DEFAULT_COORDINATES, b.coordinates) <= initialRadius;
+          if (!withinRadius) return false;
+          
+          // Filter out blacklisted buildings
+          const rowIdMatch = b.id.match(/^baserow-(\d+)$/);
+          if (rowIdMatch) {
+            const rowId = parseInt(rowIdMatch[1], 10);
+            return !blacklistedBuildingIds.has(rowId);
+          }
+          return true;
+        });
         
         // Enrich buildings with images if they have google_place_id but no imageUrl
         // Do this in batches to avoid overwhelming the API (limit to first 20)
@@ -293,7 +340,7 @@ function App() {
     };
     loadInitialBaserow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [blacklistedBuildingIds]);
 
   // Helper to calculate distance in meters
   const getDistance = (coord1: Coordinates, coord2: Coordinates) => {
@@ -315,6 +362,11 @@ function App() {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
       return;
+    }
+
+    // If permission was previously denied, try again
+    if (locationPermissionDenied) {
+      setLocationPermissionDenied(false);
     }
 
     setLoading(true);
@@ -421,7 +473,7 @@ function App() {
              return 0;
            });
            
-           setBuildings((prev) => mergeBuildings(prev, sortedResults));
+           setBuildings((prev) => filterBlacklistedBuildings(mergeBuildings(prev, sortedResults)));
            if (statusMsg) {
              setStatusMessage(statusMsg);
            }
@@ -437,12 +489,15 @@ function App() {
            setFirstLoad(false);
          }
        },
-       () => {
-         setError("Unable to retrieve location.");
+       (error) => {
+         // User denied location permission or location unavailable
+         setLocationPermissionDenied(true);
+         setError("Location access denied. Please enable location services to use this feature.");
          setLoading(false);
+         setSearchStatus('idle');
        }
      );
-   }, []);
+   }, [locationPermissionDenied]);
 
   // Helper function to find nearest building from a list
   const findNearestBuilding = useCallback((location: Coordinates, buildingsList: Building[]) => {
@@ -515,6 +570,11 @@ function App() {
   }, [findNearestBuilding]);
 
   const handleFindNearest = useCallback(async () => {
+    // If permission was previously denied, try again
+    if (locationPermissionDenied) {
+      setLocationPermissionDenied(false);
+    }
+
     // Determine reference location first
     let referenceLocation: Coordinates;
 
@@ -533,12 +593,15 @@ function App() {
             async (position) => {
               const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
               setUserLocation(coords);
+              setLocationPermissionDenied(false);
               await searchAndFindNearest(coords);
               resolve();
             },
-            async () => {
-              // Geolocation failed, use map center
-              await searchAndFindNearest(center);
+            async (error) => {
+              // Geolocation failed - user denied or unavailable
+              setLocationPermissionDenied(true);
+              setError("Location access denied. Please enable location services to find the nearest building.");
+              setLoading(false);
               resolve();
             }
           );
@@ -565,12 +628,14 @@ function App() {
           (position) => {
             const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
             setUserLocation(coords);
+            setLocationPermissionDenied(false);
             performFind(coords);
             setLoading(false);
           },
-          () => {
-             // Fallback to center of screen
-             performFind(center);
+          (error) => {
+             // Geolocation failed - user denied or unavailable
+             setLocationPermissionDenied(true);
+             setError("Location access denied. Please enable location services to find the nearest building.");
              setLoading(false);
           }
         );
@@ -578,7 +643,7 @@ function App() {
          performFind(center);
       }
     }
-  }, [buildings, userLocation, center, searchAndFindNearest, findNearestBuilding]);
+  }, [buildings, userLocation, center, searchAndFindNearest, findNearestBuilding, locationPermissionDenied]);
 
   const handleSearch = async (query: string) => {
     setLoading(true);
@@ -923,10 +988,84 @@ function App() {
     setSelectedBuilding(null);
   };
 
+  // Handler for Nick triple-click - show falling hearts
+  const handleNickTripleClick = useCallback(() => {
+    setShowFallingHearts(true);
+  }, []);
+
+  // Handler for dedupe button double-click
+  const handleDedupeButtonClick = useCallback(async () => {
+    dedupeClickCountRef.current += 1;
+    
+    // Clear existing timer
+    if (dedupeClickTimerRef.current) {
+      clearTimeout(dedupeClickTimerRef.current);
+    }
+    
+    // If we've reached 2 clicks, trigger dedupe
+    if (dedupeClickCountRef.current >= 2) {
+      dedupeClickCountRef.current = 0;
+      
+      try {
+        setLoading(true);
+        setStatusMessage("Running dedupe...");
+        console.log("🔍 Starting dedupe process...");
+        
+        const deletedIds = await dedupeBaserowBuildings();
+        
+        if (deletedIds.length > 0) {
+          // Add deleted IDs to blacklist
+          setBlacklistedBuildingIds((prev) => {
+            const updated = new Set(prev);
+            deletedIds.forEach(id => updated.add(id));
+            
+            // Save to localStorage
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem('evil-atlas-blacklisted-ids', JSON.stringify(Array.from(updated)));
+            }
+            
+            return updated;
+          });
+          
+          // Filter out blacklisted buildings from current view
+          setBuildings((prev) => filterBlacklistedBuildings(prev));
+          setAllBaserowBuildings((prev) => filterBlacklistedBuildings(prev));
+          
+          setStatusMessage(`Dedupe complete! Removed ${deletedIds.length} duplicates.`);
+          console.log(`✅ Dedupe complete. Blacklisted ${deletedIds.length} IDs.`);
+        } else {
+          setStatusMessage("No duplicates found.");
+        }
+      } catch (error: any) {
+        console.error("Dedupe error:", error);
+        setError(`Dedupe failed: ${error.message || 'Unknown error'}`);
+      } finally {
+        setLoading(false);
+        setTimeout(() => setStatusMessage(null), 3000);
+      }
+    } else {
+      // Reset counter after 1 second if no more clicks
+      dedupeClickTimerRef.current = setTimeout(() => {
+        dedupeClickCountRef.current = 0;
+      }, 1000);
+    }
+  }, [filterBlacklistedBuildings]);
+
   const colors = getThemeColors(theme);
   
   return (
-    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`} role="application" aria-label="The A Atlas - Architecture finder">
+    <>
+      <style>{`
+        .dedupe-button {
+          bottom: calc(1rem + 16px) !important;
+        }
+        @media (min-width: 768px) {
+          .dedupe-button {
+            bottom: calc(1.5rem + 16px) !important;
+          }
+        }
+      `}</style>
+      <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`} role="application" aria-label="The A Atlas - Architecture finder">
       
       {/* Search Bar - Floating */}
       <SearchPanel 
@@ -939,6 +1078,7 @@ function App() {
         statusMessage={statusMessage}
         theme={theme}
         isSidebarOpen={!!selectedBuilding}
+        locationPermissionDenied={locationPermissionDenied}
       />
 
       {/* Map Layer */}
@@ -950,6 +1090,7 @@ function App() {
           onSelectBuilding={handleSelectBuilding}
           onBoundsRequest={handleBoundsRequest}
           theme={theme}
+          onNickTripleClick={handleNickTripleClick}
         />
         {/* Map color overlay - only in dark mode */}
         {theme === 'dark' && (
@@ -1004,7 +1145,7 @@ function App() {
             }
           `}</style>
           <div className="absolute inset-0 bg-[#010E36]/80 z-30 flex items-center justify-center p-8 overflow-visible">
-            <div className="max-w-lg w-auto bg-[#282C55] px-12 py-8 shadow-xl relative rounded-[32px] overflow-visible max-[530px]:px-8 max-[530px]:py-6">
+            <div className="max-w-lg w-auto bg-[#282C55] shadow-xl relative rounded-[32px] overflow-visible" style={{ padding: '48px' }}>
                <div className="absolute right-12 top-[6.2rem] max-[530px]:hidden">
                  <img 
                    src="/images/palace.svg" 
@@ -1067,8 +1208,29 @@ function App() {
         <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
       </div>
 
+      {/* Subtle dedupe button - bottom right */}
+      <button
+        onClick={handleDedupeButtonClick}
+        className="absolute right-4 md:right-6 z-10 cursor-pointer transition-opacity hover:opacity-20 dedupe-button"
+        style={{ 
+          width: '12px', 
+          height: '12px', 
+          opacity: 0.05
+        }}
+        aria-label="Dedupe buildings (double-click)"
+        title="Double-click to dedupe"
+      >
+        <div className="w-full h-full bg-white rounded-sm" />
+      </button>
+
+      {/* Falling hearts animation */}
+      {showFallingHearts && (
+        <FallingHearts onComplete={() => setShowFallingHearts(false)} />
+      )}
+
       {/* Branding overlay (bottom right) - Removed for clean aesthetic */}
     </div>
+    </>
   );
 }
 

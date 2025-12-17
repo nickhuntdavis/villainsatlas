@@ -95,9 +95,10 @@ interface MapProps {
   onSelectBuilding: (b: Building) => void;
   onBoundsRequest?: (getBounds: () => { north: number; south: number; east: number; west: number } | null) => void;
   theme: 'dark' | 'light';
+  onNickTripleClick?: () => void;
 }
 
-export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme }) => {
+export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick }) => {
   const isDark = theme === 'dark';
   const colors = getThemeColors(theme);
 
@@ -125,6 +126,7 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
           building={b}
           isSelected={selectedBuilding?.id === b.id}
           onSelect={onSelectBuilding}
+          onTripleClick={b.name === "Nick" ? onNickTripleClick : undefined}
         />
       ))}
     </MapContainer>

@@ -13,6 +13,7 @@ interface SearchPanelProps {
   statusMessage?: string | null;
   theme: 'dark' | 'light';
   isSidebarOpen?: boolean;
+  locationPermissionDenied?: boolean;
 }
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({
@@ -25,6 +26,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   statusMessage,
   theme,
   isSidebarOpen = false,
+  locationPermissionDenied = false,
 }) => {
   const [query, setQuery] = useState('');
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
@@ -100,24 +102,34 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           <button
             type="button"
             onClick={onLocateMe}
-            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
-            title="Jump to my location"
-            aria-label="Jump to my location"
+            disabled={locationPermissionDenied && !navigator.geolocation}
+            className={`flex items-center gap-2 px-0 py-0 transition-colors ml-6 ${
+              locationPermissionDenied && navigator.geolocation
+                ? 'text-[#CDBAFF]/40 opacity-50 cursor-not-allowed'
+                : 'text-[#CDBAFF] hover:opacity-80'
+            }`}
+            title={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to my location"}
+            aria-label={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to my location"}
             style={{ fontSize: '16px' }}
           >
-            <Locate size={16} className="text-[#CDBAFF]" aria-hidden="true" />
+            <Locate size={16} className={locationPermissionDenied && navigator.geolocation ? "text-[#CDBAFF]/40" : "text-[#CDBAFF]"} aria-hidden="true" />
             <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Me</span>
           </button>
           
           <button
             type="button"
             onClick={onFindNearest}
-            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
-            title="Jump to nearest building"
-            aria-label="Jump to nearest building"
+            disabled={locationPermissionDenied && !navigator.geolocation}
+            className={`flex items-center gap-2 px-0 py-0 transition-colors ml-6 ${
+              locationPermissionDenied && navigator.geolocation
+                ? 'text-[#CDBAFF]/40 opacity-50 cursor-not-allowed'
+                : 'text-[#CDBAFF] hover:opacity-80'
+            }`}
+            title={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to nearest building"}
+            aria-label={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to nearest building"}
             style={{ fontSize: '16px' }}
           >
-            <Crosshair size={16} className="text-[#CDBAFF]" aria-hidden="true" />
+            <Crosshair size={16} className={locationPermissionDenied && navigator.geolocation ? "text-[#CDBAFF]/40" : "text-[#CDBAFF]"} aria-hidden="true" />
             <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Nearest</span>
           </button>
           
