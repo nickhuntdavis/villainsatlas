@@ -68,22 +68,25 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         ? 'md:left-[calc(24rem+1.5rem)] md:right-[3.25rem] md:w-auto md:flex md:items-center' 
         : 'md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto'
     }`}>
-      <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`}>
+      <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`} role="search" aria-label="Search for buildings">
         <div className={`relative flex items-center bg-[#282C55] rounded-[16px] pt-3 pb-3 pl-3 overflow-hidden transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`} style={{ filter: 'drop-shadow(0 6px 18px #020716)', paddingRight: '24px' }}>
           <button
             type="submit"
             disabled={isLoading}
             className="bg-[#AA8BFF] text-[#010E36] px-3 py-2 rounded-[4px] flex items-center justify-center transition-all hover:opacity-90 disabled:opacity-50"
             style={{ fontSize: '20px' }}
+            aria-label={isLoading ? "Searching..." : "Search"}
           >
             {isLoading ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2 size={18} className="animate-spin" aria-hidden="true" />
             ) : (
-              <Search size={18} strokeWidth={2.5} />
+              <Search size={18} strokeWidth={2.5} aria-hidden="true" />
             )}
           </button>
           
+          <label htmlFor="search-input" className="sr-only">Search for buildings</label>
           <input
+            id="search-input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -91,6 +94,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             className="flex-1 bg-transparent border-none px-3 py-0 text-white focus:outline-none min-w-0 placeholder:text-white"
             disabled={isLoading}
             style={{ fontSize: '16px' }}
+            aria-label="Search for buildings"
           />
           
           <button
@@ -98,10 +102,11 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             onClick={onLocateMe}
             className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
             title="Jump to my location"
+            aria-label="Jump to my location"
             style={{ fontSize: '16px' }}
           >
-            <Locate size={16} className="text-[#CDBAFF]" />
-            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }}>Me</span>
+            <Locate size={16} className="text-[#CDBAFF]" aria-hidden="true" />
+            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Me</span>
           </button>
           
           <button
@@ -109,10 +114,11 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             onClick={onFindNearest}
             className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
             title="Jump to nearest building"
+            aria-label="Jump to nearest building"
             style={{ fontSize: '16px' }}
           >
-            <Crosshair size={16} className="text-[#CDBAFF]" />
-            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }}>Nearest</span>
+            <Crosshair size={16} className="text-[#CDBAFF]" aria-hidden="true" />
+            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Nearest</span>
           </button>
           
           <button
@@ -120,10 +126,11 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             onClick={onSearchArea}
             className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
             title="Scan current area"
+            aria-label="Scan current area"
             style={{ fontSize: '16px' }}
           >
-            <Binoculars size={16} className="text-[#CDBAFF]" />
-            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }}>Scan here</span>
+            <Binoculars size={16} className="text-[#CDBAFF]" aria-hidden="true" />
+            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Scan here</span>
           </button>
         </div>
       </form>

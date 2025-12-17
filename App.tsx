@@ -757,7 +757,7 @@ function App() {
   const colors = getThemeColors(theme);
   
   return (
-    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`}>
+    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`} role="application" aria-label="The A Atlas - Architecture finder">
       
       {/* Search Bar - Floating */}
       <SearchPanel 
@@ -773,7 +773,7 @@ function App() {
       />
 
       {/* Map Layer */}
-      <div className="flex-1 relative z-0">
+      <main className="flex-1 relative z-0" aria-label="Map view">
         <AtlasMap 
           center={center}
           buildings={buildings}
@@ -801,7 +801,7 @@ function App() {
             />
           </>
         )}
-      </div>
+      </main>
 
       {/* Detail Panel - Sliding Drawer */}
       <BuildingDetails 
@@ -816,8 +816,9 @@ function App() {
         onClick={handleNButton}
         className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 transition-all flex items-center justify-center group hover:scale-105"
         title="The Architect"
+        aria-label="The Architect"
       >
-        <Heart size={20} className="group-hover:scale-110 transition-all fill-current text-red-500" />
+        <Heart size={20} className="group-hover:scale-110 transition-all fill-current text-red-500" aria-hidden="true" />
       </button>
 
 
@@ -858,8 +859,9 @@ function App() {
              <button
                onClick={handleLocateMe}
                className="w-full bg-[#AA8BFF] text-[#010E36] flex items-center justify-center group px-6 py-4 rounded-lg font-bold transition-all hover:opacity-90"
+               aria-label="Initialize scan to find buildings"
              >
-                <Scan className="mr-2" size={18} strokeWidth={2.5}/>
+                <Scan className="mr-2" size={18} strokeWidth={2.5} aria-hidden="true"/>
                 Initialize Scan
              </button>
           </div>
@@ -887,7 +889,7 @@ function App() {
             <h4 className={`${typography.label.button} ${colors.text.primary} mb-2`}>System Alert</h4>
             <p className={typography.body.sm}>{error}</p>
           </div>
-          <button onClick={() => setError(null)} className={`ml-4 ${colors.text.muted} hover:opacity-80`}><Info size={16}/></button>
+          <button onClick={() => setError(null)} className={`ml-4 ${colors.text.muted} hover:opacity-80`} aria-label="Close error message"><Info size={16} aria-hidden="true"/></button>
         </div>
       )}
 

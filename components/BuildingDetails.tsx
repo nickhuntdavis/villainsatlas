@@ -67,8 +67,9 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
   const styleColor = GENRE_COLORS[normalizedStyle] || GENRE_COLORS['Other'];
 
   return (
-    <div
+    <aside
       className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(85dvh-6rem)] md:max-h-full overflow-y-auto custom-scrollbar bg-[#020716]"
+      aria-label="Building details"
     >
       
       {/* Image Header */}
@@ -98,8 +99,9 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
             onClick={onClose}
             className="p-2 bg-[#010E36] text-[#A382FF] hover:opacity-80 rounded-full transition-colors"
             title="Close"
+            aria-label="Close building details"
           >
-            <X size={16} className="text-[#A382FF]" />
+            <X size={16} className="text-[#A382FF]" aria-hidden="true" />
           </button>
         </div>
         )}
@@ -110,8 +112,9 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
               onClick={onClose}
               className="p-2 bg-[#010E36] text-[#A382FF] hover:opacity-80 rounded-full transition-colors"
               title="Close"
+              aria-label="Close building details"
             >
-              <X size={16} className="text-[#A382FF]" />
+              <X size={16} className="text-[#A382FF]" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -121,13 +124,13 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
         </h2>
 
         <div className={`flex items-center mb-4 ${typography.body.sm} text-white`}>
-          <MapPin size={16} className="mr-2 text-white" />
+          <MapPin size={16} className="mr-2 text-white" aria-hidden="true" />
           <span className="text-white">{building.location}</span>
         </div>
 
         {building.architect && (
           <div className={`flex items-center mb-8 ${typography.body.sm} text-white`}>
-            <User size={16} className="mr-2 shrink-0 text-white" />
+            <User size={16} className="mr-2 shrink-0 text-white" aria-hidden="true" />
             <span className="text-white">
               Architect: <span className="font-medium">{building.architect}</span>
             </span>
@@ -179,8 +182,9 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center w-full py-4 bg-[#A382FF] text-[#020716] rounded-[12px] transition-all group hover:opacity-90 font-bold"
+                aria-label={`Show ${building.name} on Google Maps`}
               >
-                <Navigation size={16} className="mr-2 text-[#020716]" strokeWidth={2.5} />
+                <Navigation size={16} className="mr-2 text-[#020716]" strokeWidth={2.5} aria-hidden="true" />
                 Show on Google Maps
               </a>
             ) : null;
@@ -205,6 +209,6 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };
