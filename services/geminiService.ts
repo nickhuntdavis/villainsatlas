@@ -195,9 +195,10 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     // Try to find place ID if not already set
     const placeId = await findPlaceId(building);
     if (!placeId) {
-      console.warn(`No place ID found for "${building.name}" - skipping Places enrichment`);
+      console.warn(`⚠️ No place ID found for "${building.name}" - skipping Places enrichment`);
       return building;
     }
+    console.log(`🔍 Found place ID for "${building.name}": ${placeId}`);
 
     try {
       const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
@@ -236,14 +237,19 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
         updated.gmapsUrl = result.url;
       }
 
-      // Set imageUrl ONLY from Google Places Photos if we don't already have one
-      if (!updated.imageUrl && Array.isArray(result.photos) && result.photos.length > 0) {
+      // Always prefer Google Places Photos over any other image source
+      if (Array.isArray(result.photos) && result.photos.length > 0) {
         const photoRef = result.photos[0].photo_reference;
         if (photoRef) {
           updated.imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(
             photoRef
           )}&key=${mapsApiKey}`;
+          console.log(`✅ Set Google Places image for "${building.name}"`);
+        } else {
+          console.warn(`⚠️ No photo_reference found in photos array for "${building.name}"`);
         }
+      } else {
+        console.warn(`⚠️ No photos found in Places API result for "${building.name}"`);
       }
 
       return updated;
@@ -413,8 +419,38 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     // Be polite to the API in case of rapid subsequent calls
     await sleep(200);
 
+    // Filter buildings by distance from search location (if coordinates provided)
+    // Only include buildings within 50km of the search location
+    let filteredBuildings = enrichedBuildings;
+    if (userLat !== undefined && userLng !== undefined) {
+      const searchLocation = { lat: userLat, lng: userLng };
+      const maxDistance = 50000; // 50km in meters
+      
+      // Helper to calculate distance in meters (Haversine formula)
+      const getDistance = (coord1: { lat: number; lng: number }, coord2: { lat: number; lng: number }) => {
+        const R = 6371e3; // Earth radius in meters
+        const φ1 = (coord1.lat * Math.PI) / 180;
+        const φ2 = (coord2.lat * Math.PI) / 180;
+        const Δφ = ((coord2.lat - coord1.lat) * Math.PI) / 180;
+        const Δλ = ((coord2.lng - coord1.lng) * Math.PI) / 180;
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+      
+      filteredBuildings = enrichedBuildings.filter((b) => {
+        const distance = getDistance(searchLocation, b.coordinates);
+        return distance <= maxDistance;
+      });
+      
+      if (filteredBuildings.length < enrichedBuildings.length) {
+        console.log(`Filtered out ${enrichedBuildings.length - filteredBuildings.length} buildings outside 50km radius`);
+      }
+    }
+
     // Debug: Log building data for troubleshooting
-    enrichedBuildings.forEach((b, idx) => {
+    filteredBuildings.forEach((b, idx) => {
         console.log(`Building ${idx + 1} (${b.name}):`, {
             coordinates: b.coordinates,
             placeId: b.googlePlaceId || 'none',
@@ -427,7 +463,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     // Save new buildings to Baserow if they don't already exist (async, don't wait)
     // Use Promise.allSettled to handle all saves without blocking, but track results
     Promise.allSettled(
-      enrichedBuildings.map(async (building) => {
+      filteredBuildings.map(async (building) => {
         try {
           const existing = await findExistingBuilding(building);
           if (!existing.exists) {
@@ -453,7 +489,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
       console.log(`Baserow save summary: ${saved} saved, ${skipped} skipped, ${failed} failed`);
     });
 
-    return enrichedBuildings;
+    return filteredBuildings;
 
   } catch (error: any) {
     console.error("Gemini API Error:", error);

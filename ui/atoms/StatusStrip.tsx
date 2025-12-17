@@ -17,8 +17,8 @@ export const StatusStrip: React.FC<StatusStripProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className="mt-2 text-center">
-      <p className={`${typography.mono.default} ${colors.accent.primary} opacity-80`}>
+    <div className="mt-3 text-center">
+      <p className={`${typography.body.sm} ${colors.accent.primary} opacity-80`}>
         {statusText}
       </p>
     </div>

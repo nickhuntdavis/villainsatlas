@@ -1,5 +1,5 @@
 import React from 'react';
-import { Theme, getThemeColors } from '../theme';
+import { Theme, getThemeColors, typography } from '../theme';
 
 export interface PrimaryButtonProps {
   theme: Theme;
@@ -22,14 +22,14 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 }) => {
   const colors = getThemeColors(theme);
 
-  const baseClasses = `${colors.accent.bg} ${colors.accent.bgHover} text-white`;
+  const baseClasses = `${colors.accent.bg} ${colors.accent.bgHover} text-white ${typography.label.button}`;
 
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`p-3 transition-colors rounded-md ${fullWidth ? 'w-full' : ''} ${baseClasses} ${className}`}
+      className={`px-6 py-3 transition-colors rounded-md ${fullWidth ? 'w-full' : ''} ${baseClasses} ${className}`}
     >
       {children}
     </button>

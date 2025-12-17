@@ -15,14 +15,13 @@ export const Badge: React.FC<BadgeProps> = ({
   className = '',
 }) => {
   const colors = getThemeColors(theme);
-  const isDark = theme === 'dark';
 
-  const backgroundClass = isDark ? 'bg-zinc-900' : 'bg-zinc-100';
-  const borderClass = isDark ? 'border-zinc-700' : 'border-zinc-300';
+  const backgroundClass = colors.background.elevated;
+  const borderClass = colors.border.subtle;
 
   return (
     <span
-      className={`${typography.label.badge} ${backgroundClass} ${borderClass} px-2 py-1 rounded-sm border ${className}`}
+      className={`${typography.label.badge} ${backgroundClass} ${borderClass} px-3 py-1.5 rounded-md border ${className}`}
       style={color ? { color } : undefined}
     >
       {children}

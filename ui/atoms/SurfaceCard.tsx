@@ -18,19 +18,14 @@ export const SurfaceCard: React.FC<SurfaceCardProps> = ({
   withBlur = false,
   withShadow = false,
 }) => {
-  const isDark = theme === 'dark';
+  const colors = getThemeColors(theme);
 
-  const backgroundClass = {
-    default: isDark ? 'bg-zinc-950' : 'bg-white',
-    elevated: isDark ? 'bg-zinc-900' : 'bg-zinc-100',
-    panel: isDark ? 'bg-zinc-900/90' : 'bg-zinc-100/95',
-  }[level];
-
-  const borderClass = isDark ? 'border-zinc-700' : 'border-zinc-300';
+  const backgroundClass = colors.background[level];
+  const borderClass = colors.border.subtle;
 
   return (
     <div
-      className={`${backgroundClass} ${borderClass} ${withBlur ? blur.md : ''} ${withShadow ? shadows['2xl'] : ''} ${className}`}
+      className={`${backgroundClass} border ${borderClass} ${withBlur ? blur.sm : ''} ${withShadow ? shadows.md : ''} ${className}`}
     >
       {children}
     </div>

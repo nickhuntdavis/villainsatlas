@@ -23,17 +23,13 @@ export const IconButton: React.FC<IconButtonProps> = ({
   const colors = getThemeColors(theme);
   const isDark = theme === 'dark';
 
-  // Variant-specific classes
+  // Variant-specific classes - more subtle hover states using new color tokens
   const variantClasses = {
     default: isDark
-      ? 'text-zinc-500 hover:text-white border-zinc-800'
-      : 'text-zinc-500 hover:text-zinc-900 border-zinc-300',
-    accent: isDark
-      ? 'text-red-500 hover:text-red-400 hover:bg-zinc-800/50 border-zinc-800'
-      : 'text-red-600 hover:text-red-500 hover:bg-red-50 border-zinc-300',
-    subtle: isDark
-      ? 'text-zinc-300 hover:text-white hover:bg-zinc-800/50 border-zinc-800'
-      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200 border-zinc-300',
+      ? `${colors.text.muted} hover:${colors.text.secondary} ${colors.border.subtle}`
+      : `${colors.text.muted} hover:${colors.text.secondary} ${colors.border.subtle}`,
+    accent: `${colors.accent.primary} hover:${colors.accent.hover} ${colors.border.subtle}`,
+    subtle: `${colors.text.tertiary} hover:${colors.text.primary} ${colors.border.subtle}`,
   };
 
   return (
@@ -42,7 +38,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`p-2 transition-colors border-r ${variantClasses[variant]} ${className}`}
+      className={`p-2 transition-colors border-r hover:bg-black/5 dark:hover:bg-white/5 ${variantClasses[variant]} ${className}`}
     >
       {icon}
     </button>

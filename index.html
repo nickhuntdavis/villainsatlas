@@ -4,26 +4,105 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Villain's Atlas</title>
+    <!-- Fonts: Neue Machina for headings, Inter for body -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Neue Machina - Self-hosted font files -->
+    <link rel="preload" href="/fonts/NeueMachina-Regular.otf" as="font" type="font/otf" crossorigin>
+    <link rel="preload" href="/fonts/NeueMachina-Ultrabold.otf" as="font" type="font/otf" crossorigin>
+    <style>
+      @font-face {
+        font-family: 'Neue Machina';
+        src: url('/fonts/NeueMachina-Light.otf') format('opentype');
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Neue Machina';
+        src: url('/fonts/NeueMachina-Regular.otf') format('opentype');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Neue Machina';
+        src: url('/fonts/NeueMachina-Regular.otf') format('opentype');
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Neue Machina';
+        src: url('/fonts/NeueMachina-Ultrabold.otf') format('opentype');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Neue Machina';
+        src: url('/fonts/NeueMachina-Ultrabold.otf') format('opentype');
+        font-weight: 800;
+        font-style: normal;
+        font-display: swap;
+      }
+    </style>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              'neue-machina': ['Neue Machina', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <style>
-      /* Custom scrollbar for that industrial feel */
+      /* Custom scrollbar - minimal clean style */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #18181b; 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #3f3f46; 
-        border-radius: 0px;
+        background: #2a2a2a; 
+        border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #52525b; 
+        background: #3a3a3a; 
+      }
+      /* Light mode scrollbar */
+      @media (prefers-color-scheme: light) {
+        ::-webkit-scrollbar-thumb {
+          background: #d4d4d4; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #a3a3a3; 
+        }
       }
       .leaflet-container {
-        background: #09090b; /* zinc-950 */
+        background: #0a0a0a;
+      }
+      /* Apply Inter as default body font */
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      }
+      /* Neue Machina font utility class and CSS variable */
+      :root {
+        --font-neue-machina: 'Neue Machina', sans-serif;
+      }
+      .font-neue-machina {
+        font-family: var(--font-neue-machina);
+      }
+      /* Also support Tailwind arbitrary values */
+      [class*="font-['Neue"] {
+        font-family: 'Neue Machina', sans-serif !important;
       }
     </style>
   <script type="importmap">
@@ -41,8 +120,9 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-zinc-950 text-zinc-300 antialiased overflow-hidden">
+  <body class="bg-black text-[#fafafa] antialiased overflow-hidden">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+</html>
 </html>

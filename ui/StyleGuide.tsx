@@ -134,7 +134,7 @@ export const StyleGuide: React.FC = () => {
                   <span className={`${colors.text.muted} text-[10px]`}>elevated</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <div className={`h-12 rounded border ${colors.background.panel} ${colors.border.default}`} />
+                  <div className="h-12 rounded border bg-[#262334]/95 border-[#262334]" />
                   <span className={`${colors.text.muted} text-[10px]`}>panel</span>
                 </div>
                 <div className="flex flex-col gap-1 col-span-2">

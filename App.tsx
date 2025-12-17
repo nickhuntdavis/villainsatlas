@@ -6,8 +6,9 @@ import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
-import { AlertTriangle, Info, Heart } from 'lucide-react';
+import { AlertTriangle, Info, Heart, Scan, SunMedium, Moon } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
+import { typography, getThemeColors, fontFamily } from './ui/theme';
 
 function App() {
   const [center, setCenter] = useState<Coordinates>(DEFAULT_COORDINATES);
@@ -19,6 +20,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [firstLoad, setFirstLoad] = useState(true);
   const [searchStatus, setSearchStatus] = useState<'idle' | 'searching_baserow' | 'searching_gemini'>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem('evil-atlas-theme');
@@ -65,7 +67,18 @@ function App() {
   const getBaserowBuildingsNear = useCallback(
     async (center: Coordinates, radiusMeters: number) => {
       if (allBaserowBuildings.length > 0) {
-        return allBaserowBuildings.filter((b) => getDistance(center, b.coordinates) <= radiusMeters);
+        // Filter by distance and validate coordinates
+        return allBaserowBuildings.filter((b) => {
+          // Skip buildings with invalid coordinates
+          if (!b.coordinates || 
+              isNaN(b.coordinates.lat) || 
+              isNaN(b.coordinates.lng) ||
+              b.coordinates.lat === 0 && b.coordinates.lng === 0) {
+            return false;
+          }
+          const distance = getDistance(center, b.coordinates);
+          return distance <= radiusMeters;
+        });
       }
       const fresh = await fetchBuildingsNearLocation(center, radiusMeters);
       if (fresh.length > 0) {
@@ -76,13 +89,26 @@ function App() {
     [allBaserowBuildings]
   );
 
-  // Initial load of all Baserow buildings so markers can persist across searches
+  // Initial load of all Baserow buildings for caching and display on map
   useEffect(() => {
     const loadInitialBaserow = async () => {
       try {
         const all = await fetchAllBuildings();
-        setAllBaserowBuildings(all);
-        setBuildings((prev) => (prev.length === 0 ? all : mergeBuildings(prev, all)));
+        // Filter out buildings with invalid coordinates
+        const validBuildings = all.filter((b) => 
+          b.coordinates && 
+          !isNaN(b.coordinates.lat) && 
+          !isNaN(b.coordinates.lng) &&
+          !(b.coordinates.lat === 0 && b.coordinates.lng === 0)
+        );
+        setAllBaserowBuildings(validBuildings);
+        
+        // Display buildings within initial map view (50km radius from default center)
+        const initialRadius = 50000; // 50km
+        const buildingsInView = validBuildings.filter((b) => 
+          getDistance(DEFAULT_COORDINATES, b.coordinates) <= initialRadius
+        );
+        setBuildings(buildingsInView);
       } catch (err) {
         console.error("Error loading initial Baserow buildings:", err);
       }
@@ -115,6 +141,7 @@ function App() {
 
     setLoading(true);
     setError(null);
+    setStatusMessage(null);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -123,49 +150,87 @@ function App() {
         setCenter(newCenter);
         setUserLocation(newCenter);
         
-        try {
-          // First, try Baserow
-          setSearchStatus('searching_baserow');
-          let results = await getBaserowBuildingsNear(newCenter, 50000); // 50km radius
-          
-          // If no results in Baserow, fall back to Gemini
-          if (results.length === 0) {
-            console.log("No buildings in Baserow, querying Gemini...");
-            setSearchStatus('searching_gemini');
-            results = await fetchLairs("Current Location", latitude, longitude);
-          } else {
-            console.log(`Found ${results.length} buildings in Baserow`);
-          }
-          
-          // Sort results: prioritized buildings first
-          const sortedResults = results.sort((a, b) => {
-            if (a.isPrioritized && !b.isPrioritized) return -1;
-            if (!a.isPrioritized && b.isPrioritized) return 1;
-            return 0;
-          });
-          
-          setBuildings((prev) => mergeBuildings(prev, sortedResults));
-          if (sortedResults.length > 0) {
-             setCenter(newCenter);
-          }
-        } catch (err: any) {
-          if (err?.isRateLimit || err?.message?.includes('rate limit') || err?.message?.includes('quota')) {
-            setError("Too many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
-          } else {
-          setError("Systems failed to identify structures in this sector.");
-          }
-        } finally {
-          setLoading(false);
-          setSearchStatus('idle');
-          setFirstLoad(false);
-        }
-      },
-      () => {
-        setError("Unable to retrieve location.");
-        setLoading(false);
-      }
-    );
-  }, []);
+         try {
+           // First, try Baserow
+           setSearchStatus('searching_baserow');
+           let baserowResults = await getBaserowBuildingsNear(newCenter, 50000); // 50km radius
+           console.log(`Found ${baserowResults.length} buildings in Baserow`);
+           
+           let geminiResults: Building[] = [];
+           let geminiNewCount = 0;
+           let geminiWasCalled = false;
+           let statusMsg: string | null = null;
+           
+           // Only try Gemini if we have LESS THAN 5 Baserow results
+           if (baserowResults.length < 5) {
+             try {
+               setSearchStatus('searching_gemini');
+               geminiWasCalled = true;
+               geminiResults = await fetchLairs("Current Location", latitude, longitude);
+               // Count only new buildings (not already in baserowResults)
+               const baserowIds = new Set(baserowResults.map(b => b.id));
+               geminiNewCount = geminiResults.filter(b => !baserowIds.has(b.id)).length;
+               console.log(`Added ${geminiNewCount} new buildings from Gemini`);
+             } catch (geminiErr: any) {
+               // Check if it's a rate limit error
+               const isGeminiRateLimit = geminiErr?.isRateLimit || 
+                                        geminiErr?.message?.includes('rate limit') || 
+                                        geminiErr?.message?.includes('quota');
+               
+               if (isGeminiRateLimit) {
+                 console.warn("Gemini API rate limit reached, using Baserow results only");
+               } else {
+                 console.warn("Gemini search failed, using Baserow results only:", geminiErr);
+               }
+             }
+           }
+           
+           // Merge results
+           const results = mergeBuildings(baserowResults, geminiResults);
+           
+           // Set status messages
+           if (baserowResults.length >= 5) {
+             statusMsg = `${baserowResults.length} sexy buildings found in database`;
+           } else if (baserowResults.length > 0) {
+             statusMsg = `Only ${baserowResults.length} sexy buildings found in database, expanding search`;
+             if (geminiWasCalled) {
+               if (geminiNewCount > 0) {
+                 statusMsg += `. ${geminiNewCount} new buildings found and added to database`;
+               } else {
+                 statusMsg = `Only ${baserowResults.length} sexy buildings found in database. There aren't any other buildings sexy enough in this area`;
+               }
+             }
+           }
+           
+           // Sort results: prioritized buildings first
+           const sortedResults = results.sort((a, b) => {
+             if (a.isPrioritized && !b.isPrioritized) return -1;
+             if (!a.isPrioritized && b.isPrioritized) return 1;
+             return 0;
+           });
+           
+           setBuildings((prev) => mergeBuildings(prev, sortedResults));
+           if (statusMsg) {
+             setStatusMessage(statusMsg);
+           }
+         } catch (err: any) {
+           if (err?.isRateLimit || err?.message?.includes('rate limit') || err?.message?.includes('quota')) {
+             setError("Too many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
+           } else {
+           setError("Systems failed to identify structures in this sector.");
+           }
+         } finally {
+           setLoading(false);
+           setSearchStatus('idle');
+           setFirstLoad(false);
+         }
+       },
+       () => {
+         setError("Unable to retrieve location.");
+         setLoading(false);
+       }
+     );
+   }, []);
 
   // Helper function to find nearest building from a list
   const findNearestBuilding = useCallback((location: Coordinates, buildingsList: Building[]) => {
@@ -307,9 +372,11 @@ function App() {
     setLoading(true);
     setError(null);
     setSelectedBuilding(null);
+    setStatusMessage(null);
     
     let rateLimitError = false;
     let geocodedCoords: Coordinates | null = null;
+    let statusMessage: string | null = null;
     
     try {
       // First, geocode the location to get coordinates (using Nominatim - free, no API limits)
@@ -325,18 +392,27 @@ function App() {
       // Now perform building search
       setSearchStatus('searching_baserow');
       // First try Baserow
-      let results: Building[] = [];
+      let baserowResults: Building[] = [];
       
       if (geocodedCoords) {
-        results = await getBaserowBuildingsNear(geocodedCoords, 50000); // 50km radius
+        baserowResults = await getBaserowBuildingsNear(geocodedCoords, 50000); // 50km radius
+        console.log(`Found ${baserowResults.length} buildings in Baserow`);
       }
       
-      // If no results in Baserow, try Gemini (but handle rate limits gracefully)
-      if (results.length === 0) {
+      let geminiResults: Building[] = [];
+      let geminiNewCount = 0;
+      let geminiWasCalled = false;
+      
+      // Only try Gemini if we have LESS THAN 5 Baserow results
+      if (geocodedCoords && baserowResults.length < 5) {
         try {
           setSearchStatus('searching_gemini');
-          const geminiResults = await fetchLairs(query, geocodedCoords?.lat, geocodedCoords?.lng);
-          results = geminiResults;
+          geminiWasCalled = true;
+          geminiResults = await fetchLairs(query, geocodedCoords.lat, geocodedCoords.lng);
+          // Count only new buildings (not already in baserowResults)
+          const baserowIds = new Set(baserowResults.map(b => b.id));
+          geminiNewCount = geminiResults.filter(b => !baserowIds.has(b.id)).length;
+          console.log(`Added ${geminiNewCount} new buildings from Gemini`);
         } catch (geminiErr: any) {
           // Check if it's a rate limit error
           const isGeminiRateLimit = geminiErr?.isRateLimit || 
@@ -348,8 +424,25 @@ function App() {
             // Don't throw - we still want to show Baserow results and move the map
             console.warn("Gemini API rate limit reached, but continuing with available data");
           } else {
-            // Re-throw non-rate-limit errors
-            throw geminiErr;
+            // Don't throw - continue with Baserow results
+            console.warn("Gemini search failed, using Baserow results only:", geminiErr);
+          }
+        }
+      }
+      
+      // Merge results
+      const results = mergeBuildings(baserowResults, geminiResults);
+      
+      // Set status messages based on results
+      if (baserowResults.length >= 5) {
+        statusMessage = `${baserowResults.length} sexy buildings found in database`;
+      } else if (baserowResults.length > 0) {
+        statusMessage = `Only ${baserowResults.length} sexy buildings found in database, expanding search`;
+        if (geminiWasCalled) {
+          if (geminiNewCount > 0) {
+            statusMessage += `. ${geminiNewCount} new buildings found and added to database`;
+          } else {
+            statusMessage = `Only ${baserowResults.length} sexy buildings found in database. There aren't any other buildings sexy enough in this area`;
           }
         }
       }
@@ -363,23 +456,17 @@ function App() {
       
       setBuildings((prev) => mergeBuildings(prev, sortedResults));
       
-      // Move map to results if we have them, or to geocoded location
-      if (sortedResults.length > 0) {
-        if (geocodedCoords) {
-          setCenter(geocodedCoords);
-      } else {
-          setCenter(sortedResults[0].coordinates);
-        }
-      } else if (geocodedCoords) {
-        // Even if no results, move map to searched location
-        setCenter(geocodedCoords);
-      }
-      
-      // Show rate limit message if applicable (but only AFTER map has moved and we've tried to get results)
+      // Don't move map again - it's already at geocodedCoords
+      // Show rate limit message if applicable
       if (rateLimitError) {
         setError("Too many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
       } else if (sortedResults.length === 0) {
         setError("No ominous structures detected in this sector.");
+      }
+      
+      // Set status message
+      if (statusMessage) {
+        setStatusMessage(statusMessage);
       }
     } catch (err: any) {
        console.error(err);
@@ -413,6 +500,7 @@ function App() {
     setLoading(true);
     setError(null);
     setSelectedBuilding(null);
+    setStatusMessage(null);
 
     try {
       const bounds = getMapBoundsRef.current();
@@ -432,20 +520,58 @@ function App() {
       // Expand radius so edge buildings (and slightly beyond) are included
       const radius = getDistance(center, northeastCorner) * 1.5;
 
-      // First, try Baserow
-      setSearchStatus('searching_baserow');
-      let results = await getBaserowBuildingsNear(center, radius);
-      
-      // If no results in Baserow, fall back to Gemini
-      if (results.length === 0) {
-        console.log("No buildings in Baserow for visible area, querying Gemini...");
-        setSearchStatus('searching_gemini');
-        // Construct a descriptive query for Gemini
-        const areaDescription = `Visible map area centered at ${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}`;
-        results = await fetchLairs(areaDescription, centerLat, centerLng);
-      } else {
-        console.log(`Found ${results.length} buildings in Baserow for visible area`);
-      }
+       // First, try Baserow
+       setSearchStatus('searching_baserow');
+       let baserowResults = await getBaserowBuildingsNear(center, radius);
+       console.log(`Found ${baserowResults.length} buildings in Baserow for visible area`);
+       
+       let geminiResults: Building[] = [];
+       let geminiNewCount = 0;
+       let geminiWasCalled = false;
+       let statusMsg: string | null = null;
+       
+       // Only try Gemini if we have LESS THAN 5 Baserow results
+       if (baserowResults.length < 5) {
+         try {
+           setSearchStatus('searching_gemini');
+           geminiWasCalled = true;
+           // Construct a descriptive query for Gemini
+           const areaDescription = `Visible map area centered at ${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}`;
+           geminiResults = await fetchLairs(areaDescription, centerLat, centerLng);
+           // Count only new buildings (not already in baserowResults)
+           const baserowIds = new Set(baserowResults.map(b => b.id));
+           geminiNewCount = geminiResults.filter(b => !baserowIds.has(b.id)).length;
+           console.log(`Added ${geminiNewCount} new buildings from Gemini`);
+         } catch (geminiErr: any) {
+           // Check if it's a rate limit error
+           const isGeminiRateLimit = geminiErr?.isRateLimit || 
+                                    geminiErr?.message?.includes('rate limit') || 
+                                    geminiErr?.message?.includes('quota');
+           
+           if (isGeminiRateLimit) {
+             console.warn("Gemini API rate limit reached, using Baserow results only");
+           } else {
+             console.warn("Gemini search failed, using Baserow results only:", geminiErr);
+           }
+         }
+       }
+       
+       // Merge results
+       const results = mergeBuildings(baserowResults, geminiResults);
+       
+       // Set status messages
+       if (baserowResults.length >= 5) {
+         statusMsg = `${baserowResults.length} sexy buildings found in database`;
+       } else if (baserowResults.length > 0) {
+         statusMsg = `Only ${baserowResults.length} sexy buildings found in database, expanding search`;
+         if (geminiWasCalled) {
+           if (geminiNewCount > 0) {
+             statusMsg += `. ${geminiNewCount} new buildings found and added to database`;
+           } else {
+             statusMsg = `Only ${baserowResults.length} sexy buildings found in database. There aren't any other buildings sexy enough in this area`;
+           }
+         }
+       }
 
       // Sort results: prioritized buildings first
       const sortedResults = results.sort((a, b) => {
@@ -455,6 +581,9 @@ function App() {
       });
       
       setBuildings((prev) => mergeBuildings(prev, sortedResults));
+      if (statusMsg) {
+        setStatusMessage(statusMsg);
+      }
       if (sortedResults.length > 0) {
         setCenter(center);
       } else {
@@ -516,8 +645,10 @@ function App() {
     setSelectedBuilding(null);
   };
 
+  const colors = getThemeColors(theme);
+  
   return (
-    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-black' : 'bg-zinc-100'}`}>
+    <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`}>
       
       {/* Search Bar - Floating */}
       <SearchPanel 
@@ -527,8 +658,8 @@ function App() {
         onSearchArea={handleSearchArea}
         isLoading={loading}
         searchStatus={searchStatus}
+        statusMessage={statusMessage}
         theme={theme}
-        onToggleTheme={handleToggleTheme}
         isSidebarOpen={!!selectedBuilding}
       />
 
@@ -542,6 +673,16 @@ function App() {
           onBoundsRequest={handleBoundsRequest}
           theme={theme}
         />
+        {/* Map color overlay - only in dark mode */}
+        {theme === 'dark' && (
+          <div 
+            className="absolute inset-0 pointer-events-none z-10"
+            style={{ 
+              backgroundColor: '#030919',
+              mixBlendMode: 'exclusion'
+            }}
+          />
+        )}
       </div>
 
       {/* Detail Panel - Sliding Drawer */}
@@ -554,56 +695,57 @@ function App() {
       {/* The "N" Button - Bottom Left */}
       <button
         onClick={handleNButton}
-        className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-20 w-12 h-12 bg-zinc-900/90 hover:bg-red-900/90 border border-zinc-700 hover:border-red-600 text-white transition-all backdrop-blur-md shadow-lg flex items-center justify-center group"
+        className={`absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 ${colors.background.elevated} ${colors.border.default} ${colors.text.primary} ${colors.accent.primary} transition-all shadow-md flex items-center justify-center group border rounded-full hover:scale-105`}
         title="The Architect"
       >
-        <Heart size={20} className="text-red-500 group-hover:scale-110 group-hover:text-red-400 transition-all fill-red-500 group-hover:fill-red-400" />
+        <Heart size={20} className="group-hover:scale-110 transition-all fill-current" />
+      </button>
+
+      {/* Theme Toggle - Bottom Left, next to N button */}
+      <button
+        onClick={handleToggleTheme}
+        className={`absolute bottom-4 md:bottom-6 left-[4.5rem] md:left-[5.5rem] z-10 w-10 h-10 ${colors.background.elevated} ${colors.border.default} ${colors.text.muted} transition-all shadow-md flex items-center justify-center group border rounded-full hover:opacity-80`}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? <SunMedium size={16} /> : <Moon size={16} />}
       </button>
 
       {/* Intro / Empty State Overlay */}
       {firstLoad && !loading && (
-        <div className="absolute inset-0 bg-black/80 z-30 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden">
-             {/* Decorative stripe */}
-             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-900 via-red-600 to-red-900"></div>
-
-             <h1 className="text-4xl font-black text-white mb-2 tracking-tighter uppercase">The Villain's Atlas</h1>
-             <p className="text-zinc-400 font-mono text-sm mb-6 uppercase tracking-widest">Global Lair Surveillance System</p>
+        <div className="absolute inset-0 bg-[#010E36]/80 z-30 flex items-center justify-center p-8">
+          <div className="max-w-lg w-full bg-[#282C55] p-12 shadow-xl relative rounded-[32px]">
+             <h1 className={`${fontFamily.heading} text-[#FDFEFF] mb-3 pt-2 pb-2`} style={{ fontSize: 'clamp(32px, 3.5vw, 4.5rem)', lineHeight: '1.1' }}>the Sexy Building Atlas</h1>
+             <p className={`${typography.body.sm} text-[#FDFEFF] mb-8`}>Global architecture finder</p>
              
-             <div className="space-y-4 text-zinc-300 mb-8">
-               <p>The world is full of "pretty" buildings. We don't care about those.</p>
+             <div className={`space-y-4 ${typography.body.default} text-[#FDFEFF] mb-10`}>
+               <p>The world is full of mediocre buildings. We don't care about those.</p>
                <p>We track the brutal, the ominous, and the architectural manifestations of power.</p>
              </div>
 
-             <PrimaryButton 
-               theme={theme}
+             <button
                onClick={handleLocateMe}
-               fullWidth
-               className="py-4 font-bold uppercase tracking-widest flex items-center justify-center group"
+               className="w-full bg-[#d9d9d9] text-[#010E36] flex items-center justify-center group px-6 py-4 rounded-lg font-medium transition-all hover:opacity-90"
              >
-                <AlertTriangle className="mr-2 group-hover:animate-pulse" size={18}/>
+                <Scan className="mr-2" size={18}/>
                 Initialize Scan
-             </PrimaryButton>
+             </button>
           </div>
         </div>
       )}
 
       {/* Error Toast */}
       {error && (
-        <div className="absolute bottom-4 md:bottom-6 right-4 md:right-6 z-50 max-w-sm bg-red-950/90 border-l-4 border-red-600 text-red-200 p-4 shadow-lg backdrop-blur-md flex items-start animate-in slide-in-from-bottom-5">
-          <AlertTriangle className="shrink-0 mr-3" size={20} />
-          <div>
-            <h4 className="font-bold uppercase text-xs tracking-wider mb-1">System Alert</h4>
-            <p className="text-sm">{error}</p>
+        <div className={`absolute bottom-4 md:bottom-6 right-4 md:right-6 z-50 max-w-sm ${colors.background.surface} ${colors.border.default} ${colors.text.secondary} p-6 shadow-lg border rounded-lg flex items-start`}>
+          <AlertTriangle className={`shrink-0 mr-3 ${colors.accent.primary}`} size={20} />
+          <div className="flex-1">
+            <h4 className={`${typography.label.button} ${colors.text.primary} mb-2`}>System Alert</h4>
+            <p className={typography.body.sm}>{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="ml-auto hover:text-white"><Info size={16}/></button>
+          <button onClick={() => setError(null)} className={`ml-4 ${colors.text.muted} hover:opacity-80`}><Info size={16}/></button>
         </div>
       )}
 
-      {/* Branding overlay (bottom right) */}
-      <div className="absolute bottom-2 right-2 z-10 opacity-30 pointer-events-none hidden md:block">
-        <h1 className="text-6xl font-black text-white tracking-tighter leading-none select-none">ATLAS</h1>
-      </div>
+      {/* Branding overlay (bottom right) - Removed for clean aesthetic */}
     </div>
   );
 }

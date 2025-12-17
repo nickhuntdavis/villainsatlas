@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Locate, Crosshair, MapPin, SunMedium, Moon } from 'lucide-react';
-import { IconButton, PrimaryButton, SurfaceCard, StatusStrip } from '../ui/atoms';
+import { Search, Loader2, Locate, Crosshair, MapPin } from 'lucide-react';
+import { SurfaceCard, StatusStrip } from '../ui/atoms';
 import { typography, getThemeColors } from '../ui/theme';
 
 interface SearchPanelProps {
@@ -10,8 +10,8 @@ interface SearchPanelProps {
   onSearchArea: () => void;
   isLoading: boolean;
   searchStatus: 'idle' | 'searching_baserow' | 'searching_gemini';
+  statusMessage?: string | null;
   theme: 'dark' | 'light';
-  onToggleTheme: () => void;
   isSidebarOpen?: boolean;
 }
 
@@ -22,8 +22,8 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   onSearchArea,
   isLoading,
   searchStatus,
+  statusMessage,
   theme,
-  onToggleTheme,
   isSidebarOpen = false,
 }) => {
   const [query, setQuery] = useState('');
@@ -63,98 +63,76 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   const colors = getThemeColors(theme);
 
   return (
-    <div className={`absolute top-4 left-4 right-4 z-10 flex flex-col gap-2 pointer-events-none transition-all duration-300 ${
+    <div className={`absolute top-6 left-6 right-6 z-10 flex flex-col gap-3 pointer-events-none transition-all duration-300 ${
       isSidebarOpen 
         ? 'md:left-[calc(24rem+1.5rem)] md:right-[3.25rem] md:w-auto md:flex md:items-center' 
         : 'md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto'
     }`}>
       <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`}>
-        <div className="absolute inset-0 bg-red-900/10 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <SurfaceCard
-          theme={theme}
-          level="panel"
-          withBlur
-          withShadow
-          className={`relative flex items-center rounded-lg p-1 overflow-hidden focus-within:ring-1 transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`}
-        >
+        <div className={`relative flex items-center bg-[#282C55] rounded-[16px] pt-3 pb-3 pr-3 pl-6 overflow-hidden transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`}>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ENTER SECTOR / CITY..."
-            className={`flex-1 bg-transparent border-none px-4 py-3 ${typography.mono.default} focus:outline-none min-w-0 ${
-              isDark
-                ? 'text-zinc-100 placeholder-zinc-500'
-                : 'text-zinc-900 placeholder-zinc-400'
-            }`}
+            placeholder="Enter sector or city..."
+            className="flex-1 bg-transparent border-none px-0 py-0 text-white focus:outline-none min-w-0 placeholder:text-white"
             disabled={isLoading}
-          />
-          
-          <IconButton
-            theme={theme}
-            onClick={onLocateMe}
-            icon={<Locate size={18} />}
-            title="Scan Current Sector"
-            variant="default"
+            style={{ fontSize: '16px' }}
           />
           
           <button
             type="button"
-            onClick={onSearchArea}
-            className={`flex items-center gap-2 px-3 py-2 transition-colors border-r ${typography.label.button} ${
-              isDark
-                ? 'text-red-500 hover:text-red-400 hover:bg-zinc-800/50 border-zinc-800'
-                : 'text-red-600 hover:text-red-500 hover:bg-red-50 border-zinc-300'
-            }`}
-            title="Target Visible Area"
+            onClick={onLocateMe}
+            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
+            title="Jump to my location"
+            style={{ fontSize: '16px' }}
           >
-            <MapPin size={16} className={colors.accent.primary} />
-            <span className={`hidden sm:inline ${colors.accent.primary}`}>Here</span>
+            <Locate size={16} className="text-[#CDBAFF]" />
+            <span className="hidden lg:inline">Me</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={onSearchArea}
+            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
+            title="Scan current area"
+            style={{ fontSize: '16px' }}
+          >
+            <MapPin size={16} className="text-[#CDBAFF]" />
+            <span className="hidden lg:inline">Here</span>
           </button>
           
           <button
             type="button"
             onClick={onFindNearest}
-            className={`flex items-center gap-2 px-3 py-2 transition-colors border-r ${typography.label.button} ${
-              isDark
-                ? 'text-red-500 hover:text-red-400 hover:bg-zinc-800/50 border-zinc-800'
-                : 'text-red-600 hover:text-red-500 hover:bg-red-50 border-zinc-300'
-            }`}
-            title="Target Nearest Lair"
+            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
+            title="Jump to nearest building"
+            style={{ fontSize: '16px' }}
           >
-            <Crosshair size={16} className={colors.accent.primary} />
-            <span className="hidden sm:inline">Nearest</span>
+            <Crosshair size={16} className="text-[#CDBAFF]" />
+            <span className="hidden lg:inline">Nearest</span>
           </button>
 
-          <IconButton
-            theme={theme}
-            onClick={onToggleTheme}
-            icon={isDark ? <SunMedium size={16} /> : <Moon size={16} />}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            variant="subtle"
-            className="px-3 py-2"
-          />
-
-          <PrimaryButton
-            theme={theme}
+          <button
             type="submit"
             disabled={isLoading}
-            className="ml-1"
+            className="bg-[#AA8BFF] text-[#010E36] px-3 py-2 rounded-[4px] flex items-center justify-center transition-all hover:opacity-90 disabled:opacity-50 ml-6"
+            style={{ fontSize: '20px' }}
           >
             {isLoading ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
-              <Search size={18} />
+              <Search size={18} strokeWidth={2.5} />
             )}
-          </PrimaryButton>
-        </SurfaceCard>
+          </button>
+        </div>
       </form>
       
       {/* Loading Status Text */}
       <StatusStrip
         theme={theme}
-        statusText={loadingMessages[loadingMessageIndex]}
-        isVisible={isLoading && searchStatus !== 'idle'}
+        statusText={isLoading && searchStatus !== 'idle' ? loadingMessages[loadingMessageIndex] : (statusMessage || '')}
+        isVisible={(isLoading && searchStatus !== 'idle') || (!!statusMessage && !isLoading)}
       />
     </div>
   );

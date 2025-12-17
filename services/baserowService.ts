@@ -78,12 +78,9 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
 
   // Extract image URL from markdown format if present
   const rawImageUrl = extractUrlFromMarkdown(row.image_url);
-  // Only allow Google Places / Google-hosted photos; ignore others (e.g. Wikimedia)
-  const isGooglePlacesImage =
-    rawImageUrl &&
-    (rawImageUrl.includes('maps.googleapis.com/maps/api/place/photo') ||
-      rawImageUrl.includes('lh3.googleusercontent.com'));
-  const imageUrl = isGooglePlacesImage ? rawImageUrl : undefined;
+  // Allow all image URLs for display (previously only allowed Google Places)
+  // This ensures images like Nick's can display even if not from Google Places
+  const imageUrl = rawImageUrl || undefined;
 
   return {
     id: `baserow-${row.id}`,

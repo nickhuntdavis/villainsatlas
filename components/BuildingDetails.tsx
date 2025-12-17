@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Building } from '../types';
-import { X, MapPin, Navigation, ImageOff } from 'lucide-react';
+import { X, MapPin, Navigation, ImageOff, User } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyle } from '../constants';
-import { IconButton, PrimaryButton, SurfaceCard, Badge } from '../ui/atoms';
-import { typography, getThemeColors } from '../ui/theme';
+import { typography, fontFamily } from '../ui/theme';
 
 interface BuildingDetailsProps {
   building: Building | null;
@@ -36,9 +35,6 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
 
   if (!building) return null;
 
-  const isDark = theme === 'dark';
-  const colors = getThemeColors(theme);
-
   // Extract clean image URL (handle markdown format)
   const cleanImageUrl = extractUrlFromMarkdown(building.imageUrl);
 
@@ -46,82 +42,72 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
   const styleColor = GENRE_COLORS[normalizedStyle] || GENRE_COLORS['Other'];
 
   return (
-    <SurfaceCard
-      theme={theme}
-      level="panel"
-      withBlur
-      withShadow
-      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-r border-t md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(85dvh-6rem)] md:max-h-full overflow-y-auto custom-scrollbar"
+    <div
+      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full border-t md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(85dvh-6rem)] md:max-h-full overflow-y-auto custom-scrollbar bg-[#020716]"
     >
       
       {/* Image Header */}
-      <div className={`relative w-full overflow-hidden shrink-0 ${isDark ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
+      <div className="relative w-full overflow-hidden shrink-0 bg-[#020716]">
         {cleanImageUrl && !imgError ? (
           <div className="relative w-full h-full group">
              <img 
               src={cleanImageUrl}
               alt={building.name}
-              className={`w-full h-auto max-h-[32rem] object-contain contrast-125 group-hover:grayscale-0 transition-all duration-700 ease-out ${
-                isDark ? 'grayscale' : ''
-              }`}
+              className="w-full h-auto max-h-[32rem] object-contain transition-opacity duration-300"
               onError={(e) => {
                 console.warn('Image failed to load:', cleanImageUrl, e);
                 setImgError(true);
               }}
             />
-            <div
-              className={`absolute inset-0 bg-gradient-to-t opacity-90 ${
-                isDark
-                  ? 'from-zinc-950 via-transparent to-transparent'
-                  : 'from-white via-transparent to-transparent'
-              }`}
-            ></div>
           </div>
         ) : (
           <div
-            className={`w-full h-full flex flex-col items-center justify-center pattern-grid-lg ${
-              isDark ? 'text-zinc-700 bg-zinc-900' : 'text-zinc-400 bg-zinc-100'
-            }`}
+            className="w-full h-full flex flex-col items-center justify-center bg-[#020716]"
           >
-             <ImageOff size={32} className="mb-2 opacity-50" />
-             <span className="text-xs font-mono uppercase tracking-widest opacity-50">Visuals Classified</span>
+             <ImageOff size={32} className="mb-2 opacity-50 text-white" />
+             <span className={`${typography.body.sm} opacity-50 text-white`}>Visuals Classified</span>
           </div>
         )}
         
         <button
           onClick={onClose}
-          className={`absolute top-4 right-4 p-2 backdrop-blur-md rounded-full transition-colors z-10 border ${
-            isDark
-              ? 'bg-black/50 hover:bg-black/80 text-zinc-300 hover:text-white border-white/10'
-              : 'bg-white/80 hover:bg-white text-zinc-700 hover:text-black border-zinc-200'
-          }`}
+          className="absolute top-6 right-6 p-2 bg-[#010E36] text-[#A382FF] hover:opacity-80 rounded-full transition-colors z-10"
           title="Close"
         >
-          <X size={16} />
+          <X size={16} className="text-[#A382FF]" />
         </button>
       </div>
 
-      <div className="p-6 flex flex-col flex-1">
+      <div className="p-8 flex flex-col flex-1">
         {building.style && (
-        <div className="flex justify-between items-start mb-4">
-          <Badge theme={theme} color={styleColor}>
-            {building.style}
-          </Badge>
+        <div className="flex justify-between items-start mb-6">
+          <div className="bg-[#282C55] rounded-[4px] px-3 py-1.5 inline-block">
+            <span className="text-white text-sm font-medium">{building.style}</span>
+          </div>
         </div>
         )}
 
-        <h2 className={`${typography.heading.lg} mb-2 leading-none break-words ${colors.text.primary}`}>
+        <h2 className={`${fontFamily.heading} mb-4 break-words text-white`} style={{ fontSize: 'clamp(32px, 3.5vw, 4.5rem)', lineHeight: '1.1' }}>
           {building.name}
         </h2>
 
-        <div className={`flex items-center mb-6 text-sm ${colors.text.muted}`}>
-          <MapPin size={14} className="mr-1" />
-          <span className="uppercase tracking-wide text-xs">{building.location}</span>
+        <div className={`flex items-center mb-4 ${typography.body.sm} text-white`}>
+          <MapPin size={16} className="mr-2 text-white" />
+          <span className="text-white">{building.location}</span>
         </div>
 
-        <div className={`prose prose-sm mb-8 border-l-2 pl-4 ${isDark ? 'prose-invert border-zinc-800' : 'border-zinc-200'}`}>
-          <p className={`leading-relaxed italic text-sm ${colors.text.tertiary}`}>
-            "{building.description}"
+        {building.architect && (
+          <div className={`flex items-center mb-8 ${typography.body.sm} text-white`}>
+            <User size={16} className="mr-2 shrink-0 text-white" />
+            <span className="text-white">
+              Architect: <span className="font-medium">{building.architect}</span>
+            </span>
+          </div>
+        )}
+
+        <div className={`${typography.body.default} mb-8 pl-0`}>
+          <p className="leading-relaxed text-white">
+            {building.description}
           </p>
         </div>
 
@@ -159,27 +145,23 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                 href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center w-full py-3 ${typography.label.button} transition-all group border ${
-                  isDark
-                    ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500'
-                    : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300 hover:border-zinc-400'
-                }`}
+                className="flex items-center justify-center w-full py-4 bg-[#A382FF] text-[#020716] rounded-[12px] transition-all group hover:opacity-90"
               >
-                <Navigation size={14} className="mr-2 group-hover:text-red-500" />
-                Verify Intel (Google Maps)
+                <Navigation size={16} className="mr-2 text-[#020716]" />
+                Show on Google Maps
               </a>
             ) : null;
           })()}
         </div>
         
-        {/* Decorative Elements for Vibe */}
-        <div className={`mt-8 pt-6 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-200'}`}>
-          <div className={`flex justify-between ${typography.mono.sm} ${colors.text.muted}`}>
+        {/* Coordinates */}
+        <div className="mt-8 pt-6 border-t border-white/20">
+          <div className={`flex justify-between ${typography.mono.sm} text-white`}>
              <span>Lat: {building.coordinates.lat.toFixed(4)}</span>
              <span>Lng: {building.coordinates.lng.toFixed(4)}</span>
           </div>
         </div>
       </div>
-    </SurfaceCard>
+    </div>
   );
 };
