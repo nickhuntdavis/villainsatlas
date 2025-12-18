@@ -12,6 +12,13 @@ export default defineConfig(({ mode }) => {
       process.env.VITE_GEMINI_API_KEY || 
       process.env.GEMINI_API_KEY;
     
+    // Support both VITE_GOOGLE_MAPS_API_KEY and GOOGLE_MAPS_API_KEY for flexibility
+    const googleMapsApiKey = 
+      env.VITE_GOOGLE_MAPS_API_KEY || 
+      env.GOOGLE_MAPS_API_KEY || 
+      process.env.VITE_GOOGLE_MAPS_API_KEY || 
+      process.env.GOOGLE_MAPS_API_KEY;
+    
     if (!geminiApiKey && mode === 'production') {
       console.warn('⚠️  WARNING: GEMINI_API_KEY is missing. The app may not work correctly in production.');
     }
@@ -25,6 +32,8 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(geminiApiKey),
         'process.env.GEMINI_API_KEY': JSON.stringify(geminiApiKey),
+        'process.env.GOOGLE_MAPS_API_KEY': JSON.stringify(googleMapsApiKey),
+        'process.env.REACT_APP_GOOGLE_MAPS_API_KEY': JSON.stringify(googleMapsApiKey),
         'process.env.REACT_APP_BASEROW_API_TOKEN': JSON.stringify(env.VITE_BASEROW_API_TOKEN || env.REACT_APP_BASEROW_API_TOKEN || process.env.VITE_BASEROW_API_TOKEN || process.env.REACT_APP_BASEROW_API_TOKEN),
         'process.env.REACT_APP_BASEROW_TABLE_ID': JSON.stringify(env.VITE_BASEROW_TABLE_ID || env.REACT_APP_BASEROW_TABLE_ID || process.env.VITE_BASEROW_TABLE_ID || process.env.REACT_APP_BASEROW_TABLE_ID)
       },

@@ -40,6 +40,14 @@ VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 VITE_BASEROW_API_TOKEN=your_baserow_personal_token
 VITE_BASEROW_BASE_URL=https://api.baserow.io/api
 VITE_BASEROW_TABLE_ID=your_table_id
+
+# Optional: API server configuration
+VITE_API_PORT=3001                    # Development only: port for Express API server
+
+# Netlify Production Deployment:
+# - Serverless functions are automatically deployed from netlify/functions/
+# - Set GOOGLE_MAPS_API_KEY in Netlify environment variables
+# - Functions are accessible via /api/* routes (configured in netlify.toml)
 ```
 
 You may already have this file from AI Studio export; adjust as needed.  

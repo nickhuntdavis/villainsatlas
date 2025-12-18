@@ -1,0 +1,31 @@
+[build]
+  # Build command for Vite
+  command = "npm run build"
+  # Publish directory (Vite's default output)
+  publish = "dist"
+
+# Redirect API calls to Netlify functions
+[[redirects]]
+  from = "/api/places/details"
+  to = "/.netlify/functions/places-details"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/places/find"
+  to = "/.netlify/functions/places-find"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+  force = true
+
+# SPA fallback - redirect all non-file requests to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+

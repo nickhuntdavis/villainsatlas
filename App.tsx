@@ -54,6 +54,10 @@ function App() {
   const dedupeClickCountRef = useRef(0);
   const dedupeClickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Ref for backfill images button double-click detection
+  const backfillClickCountRef = useRef(0);
+  const backfillClickTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Persist theme and expose as data attribute for potential global styling
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -1054,6 +1058,137 @@ function App() {
     }
   }, [filterBlacklistedBuildings]);
 
+  // Handler for backfill images button double-click
+  const handleBackfillImagesButtonClick = useCallback(async () => {
+    backfillClickCountRef.current += 1;
+    
+    // Clear existing timer
+    if (backfillClickTimerRef.current) {
+      clearTimeout(backfillClickTimerRef.current);
+    }
+    
+    // If we've reached 2 clicks, trigger backfill
+    if (backfillClickCountRef.current >= 2) {
+      backfillClickCountRef.current = 0;
+      
+      try {
+        if (!getMapBoundsRef.current) {
+          setError("Map bounds not available. Please wait for map to load.");
+          return;
+        }
+
+        const bounds = getMapBoundsRef.current();
+        if (!bounds) {
+          setError("Unable to determine map bounds.");
+          return;
+        }
+
+        setLoading(true);
+        setStatusMessage("Backfilling images...");
+        console.log("🖼️ Starting image backfill for visible area...");
+        
+        // Get all buildings currently in view (from allBaserowBuildings)
+        const buildingsInView = allBaserowBuildings.filter((building) => {
+          if (!building.coordinates) return false;
+          
+          // Check if building is within bounds
+          const lat = building.coordinates.lat;
+          const lng = building.coordinates.lng;
+          
+          return lat >= bounds.south && 
+                 lat <= bounds.north && 
+                 lng >= bounds.west && 
+                 lng <= bounds.east;
+        });
+
+        // Filter to buildings that have googlePlaceId but no imageUrl
+        const buildingsNeedingImages = buildingsInView.filter(
+          (b) => b.googlePlaceId && !b.imageUrl
+        );
+
+        if (buildingsNeedingImages.length === 0) {
+          setStatusMessage("No buildings need image backfill in this area.");
+          setLoading(false);
+          setTimeout(() => setStatusMessage(null), 3000);
+          return;
+        }
+
+        console.log(`Found ${buildingsNeedingImages.length} buildings needing images`);
+
+        // Fetch images for each building and update Baserow
+        let successCount = 0;
+        let failCount = 0;
+        const enrichedBuildingsMap = new Map<string, Building>();
+
+        for (const building of buildingsNeedingImages) {
+          try {
+            console.log(`🔍 Attempting to fetch image for "${building.name}" (place_id: ${building.googlePlaceId || 'MISSING'})`);
+            const enrichedBuilding = await fetchImageForBuilding(building);
+            
+            // If we got an image, update it in Baserow
+            if (enrichedBuilding.imageUrl && enrichedBuilding.imageUrl !== building.imageUrl) {
+              // Extract row ID from building ID (format: "baserow-{rowId}")
+              const rowIdMatch = building.id.match(/^baserow-(\d+)$/);
+              if (rowIdMatch) {
+                const rowId = parseInt(rowIdMatch[1], 10);
+                await updateBuildingInBaserow(rowId, enrichedBuilding);
+                successCount++;
+                enrichedBuildingsMap.set(building.id, enrichedBuilding);
+                console.log(`✅ Backfilled image for "${building.name}"`);
+              } else {
+                console.warn(`⚠️ Could not extract row ID from building ID: ${building.id}`);
+                failCount++;
+              }
+            } else {
+              console.log(`ℹ️ No image available for "${building.name}"`);
+              failCount++;
+            }
+
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+          } catch (error: any) {
+            console.error(`Error backfilling image for "${building.name}":`, error);
+            failCount++;
+          }
+        }
+
+        // Update local state with enriched buildings
+        if (successCount > 0 && enrichedBuildingsMap.size > 0) {
+          setAllBaserowBuildings((prev) => {
+            const updated = new Map(prev.map(b => [b.id, b]));
+            enrichedBuildingsMap.forEach((enriched, id) => {
+              updated.set(id, enriched);
+            });
+            return Array.from(updated.values());
+          });
+
+          // Also update buildings in current view
+          setBuildings((prev) => {
+            const updated = new Map(prev.map(b => [b.id, b]));
+            enrichedBuildingsMap.forEach((enriched, id) => {
+              updated.set(id, enriched);
+            });
+            return Array.from(updated.values());
+          });
+        }
+
+        setStatusMessage(`Backfill complete! ${successCount} images added, ${failCount} skipped.`);
+        console.log(`✅ Backfill complete. ${successCount} images added, ${failCount} skipped.`);
+      } catch (error: any) {
+        console.error("Backfill error:", error);
+        setError(`Backfill failed: ${error.message || 'Unknown error'}`);
+      } finally {
+        setLoading(false);
+        setTimeout(() => setStatusMessage(null), 5000);
+      }
+    } else {
+      // Reset counter after 1 second if no more clicks
+      backfillClickTimerRef.current = setTimeout(() => {
+        backfillClickCountRef.current = 0;
+      }, 1000);
+    }
+  }, [allBaserowBuildings]);
+
   const colors = getThemeColors(theme);
   
   return (
@@ -1065,6 +1200,16 @@ function App() {
         @media (min-width: 768px) {
           .dedupe-button {
             bottom: calc(1.5rem + 16px) !important;
+          }
+        }
+        .backfill-button {
+          bottom: calc(1rem + 16px) !important;
+          right: calc(1rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
+        }
+        @media (min-width: 768px) {
+          .backfill-button {
+            bottom: calc(1.5rem + 16px) !important;
+            right: calc(1.5rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
           }
         }
       `}</style>
@@ -1220,6 +1365,21 @@ function App() {
       <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center">
         <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
       </div>
+
+      {/* Subtle backfill images button - bottom right (left of dedupe) */}
+      <button
+        onClick={handleBackfillImagesButtonClick}
+        className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 backfill-button"
+        style={{ 
+          width: '12px', 
+          height: '12px', 
+          opacity: 0.08
+        }}
+        aria-label="Backfill images (double-click)"
+        title="Double-click to backfill images"
+      >
+        <div className="w-full h-full bg-white rounded-sm" />
+      </button>
 
       {/* Subtle dedupe button - bottom right */}
       <button

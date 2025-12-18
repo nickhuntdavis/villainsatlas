@@ -2,6 +2,20 @@ import { GoogleGenAI } from "@google/genai";
 import { Building, ArchitecturalStyle, Coordinates } from "../types";
 import { saveBuildingToBaserow, findExistingBuilding } from "./baserowService";
 
+// Helper to get API base URL (environment-aware for dev/production)
+const getApiBaseUrl = (): string => {
+  const env = (import.meta as any).env || {};
+  // In production, use relative URL (Netlify redirects handle routing)
+  if (env.PROD) {
+    // Production: use relative URL - Netlify redirects will route to functions
+    // Or use explicit URL if VITE_API_URL is set (for custom deployments)
+    return env.VITE_API_URL || '';
+  }
+  // Development: use localhost with port (Express server)
+  const apiPort = env.VITE_API_PORT || '3001';
+  return `http://localhost:${apiPort}`;
+};
+
 // Helper to extract JSON array from potentially markdown-formatted text
 const extractJson = (str: string): string => {
   // Finds the first '[' and the last ']'
@@ -158,23 +172,23 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
   const mapsApiKey =
     (typeof import.meta !== "undefined" &&
       // Vite-style env exposure
-      ((import.meta as any).env?.GOOGLE_MAPS_API_KEY ||
+      ((import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
+        (import.meta as any).env?.GOOGLE_MAPS_API_KEY ||
         (import.meta as any).env?.REACT_APP_GOOGLE_MAPS_API_KEY)) ||
     // Fallback for possible Node or non-Vite environments
-    (process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
+    (process.env.VITE_GOOGLE_MAPS_API_KEY ||
+     process.env.GOOGLE_MAPS_API_KEY || 
+     process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
 
   // Helper to find place ID using Places API text search if not already set
   const findPlaceId = async (building: Building): Promise<string | undefined> => {
-    if (!mapsApiKey || building.googlePlaceId) {
-      return building.googlePlaceId;
-    }
-
     try {
-      // Try to find place ID using text search
+      // Use proxy endpoint to avoid CORS issues
       const searchQuery = `${building.name}, ${building.location || building.city || ''}`.trim();
-      const searchUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(searchQuery)}&inputtype=textquery&fields=place_id&key=${mapsApiKey}`;
+      const apiBaseUrl = getApiBaseUrl();
+      const proxyUrl = `${apiBaseUrl}/api/places/find?input=${encodeURIComponent(searchQuery)}&inputtype=textquery&fields=place_id`;
       
-      const res = await fetch(searchUrl);
+      const res = await fetch(proxyUrl);
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'OK' && data.candidates && data.candidates.length > 0) {
@@ -201,11 +215,13 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     console.log(`🔍 Found place ID for "${building.name}": ${placeId}`);
 
     try {
-      const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+      // Use proxy endpoint to avoid CORS issues
+      const apiBaseUrl = getApiBaseUrl();
+      const proxyUrl = `${apiBaseUrl}/api/places/details?place_id=${encodeURIComponent(
         placeId
-      )}&fields=place_id,url,photos,types&key=${mapsApiKey}`;
+      )}&fields=place_id,url,photos,types`;
 
-      const res = await fetch(detailsUrl);
+      const res = await fetch(proxyUrl);
       if (!res.ok) {
         console.warn(
           `Places Details error for ${placeId}: ${res.status} ${res.statusText}`
@@ -523,50 +539,97 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
 // Export function to fetch image for a building that has google_place_id but no imageUrl
 export const fetchImageForBuilding = async (building: Building): Promise<Building> => {
   // Only fetch if building has place ID but no image
-  if (!building.googlePlaceId || building.imageUrl) {
+  if (!building.googlePlaceId) {
+    console.warn(`⚠️ Building "${building.name}" has no googlePlaceId, skipping image fetch`);
+    return building;
+  }
+  
+  if (building.imageUrl) {
+    console.log(`ℹ️ Building "${building.name}" already has imageUrl, skipping fetch`);
     return building;
   }
 
   const mapsApiKey =
     (typeof import.meta !== "undefined" &&
-      ((import.meta as any).env?.GOOGLE_MAPS_API_KEY ||
+      ((import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
+        (import.meta as any).env?.GOOGLE_MAPS_API_KEY ||
         (import.meta as any).env?.REACT_APP_GOOGLE_MAPS_API_KEY)) ||
-    (process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
+    (process.env.VITE_GOOGLE_MAPS_API_KEY || 
+     process.env.GOOGLE_MAPS_API_KEY || 
+     process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
 
   if (!mapsApiKey) {
+    console.warn(`⚠️ No Google Maps API key found, cannot fetch image for "${building.name}"`);
     return building;
+  }
+  
+  console.log(`🔍 Fetching Places details for "${building.name}" with place_id: ${building.googlePlaceId}`);
+
+  // Check if API server is available (optional - don't block if it's not)
+  // Only do health check in development
+  const env = (import.meta as any).env || {};
+  if (!env.PROD) {
+    const apiBaseUrl = getApiBaseUrl();
+    const healthCheckUrl = `${apiBaseUrl}/api/health`;
+    
+    try {
+      const healthRes = await fetch(healthCheckUrl, { signal: AbortSignal.timeout(1000) });
+      if (!healthRes.ok) {
+        console.warn(`⚠️ API server health check failed. Skipping image fetch for "${building.name}"`);
+        return building;
+      }
+    } catch (err) {
+      // API server not running - silently skip image fetching
+      console.debug(`API server not available, skipping image fetch for "${building.name}"`);
+      return building;
+    }
   }
 
   try {
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+    // Use proxy endpoint to avoid CORS issues
+    const apiBaseUrl = getApiBaseUrl();
+    const proxyUrl = `${apiBaseUrl}/api/places/details?place_id=${encodeURIComponent(
       building.googlePlaceId
-    )}&fields=photos&key=${mapsApiKey}`;
+    )}&fields=photos`;
 
-    const res = await fetch(detailsUrl);
+    console.log(`🌐 Making Places API request via proxy for "${building.name}": ${proxyUrl}`);
+    const res = await fetch(proxyUrl);
+    console.log(`📡 Places API response status: ${res.status} ${res.statusText}`);
     if (!res.ok) {
+      console.warn(`⚠️ Places API HTTP error for "${building.name}" (place_id: ${building.googlePlaceId}): ${res.status} ${res.statusText}`);
       return building;
     }
 
     const data = await res.json();
-    if (data.status !== "OK" || !data.result) {
+    if (data.status !== "OK") {
+      console.warn(`⚠️ Places API status error for "${building.name}" (place_id: ${building.googlePlaceId}): ${data.status}${data.error_message ? ` - ${data.error_message}` : ''}`);
+      return building;
+    }
+
+    if (!data.result) {
+      console.warn(`⚠️ Places API returned no result for "${building.name}" (place_id: ${building.googlePlaceId})`);
       return building;
     }
 
     const result = data.result;
 
     // Fetch image from Google Places Photos if available
-    if (Array.isArray(result.photos) && result.photos.length > 0) {
-      const photoRef = result.photos[0].photo_reference;
-      if (photoRef) {
-        const imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(
-          photoRef
-        )}&key=${mapsApiKey}`;
-        console.log(`✅ Fetched Google Places image for "${building.name}"`);
-        return { ...building, imageUrl };
-      }
+    if (!Array.isArray(result.photos) || result.photos.length === 0) {
+      console.warn(`⚠️ No photos array found for "${building.name}" (place_id: ${building.googlePlaceId})`);
+      return building;
     }
 
-    return building;
+    const photoRef = result.photos[0].photo_reference;
+    if (!photoRef) {
+      console.warn(`⚠️ No photo_reference in first photo for "${building.name}" (place_id: ${building.googlePlaceId})`);
+      return building;
+    }
+
+    const imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(
+      photoRef
+    )}&key=${mapsApiKey}`;
+    console.log(`✅ Fetched Google Places image for "${building.name}"`);
+    return { ...building, imageUrl };
   } catch (err) {
     console.warn(`Error fetching image for "${building.name}":`, err);
     return building;
