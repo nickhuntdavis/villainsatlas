@@ -18,18 +18,55 @@ export const FallingHearts: React.FC<FallingHeartsProps> = ({ onComplete }) => {
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
 
   useEffect(() => {
-    // Generate 30-50 hearts with varying properties
-    const heartCount = Math.floor(Math.random() * 21) + 30; // 30-50 hearts
+    // Generate hearts in 4 staggered sets
     const newHearts: HeartParticle[] = [];
+    let heartId = 0;
 
-    for (let i = 0; i < heartCount; i++) {
+    // Set 1: 150 hearts - appear first (0-0.5s delay)
+    for (let i = 0; i < 150; i++) {
       newHearts.push({
-        id: i,
-        left: Math.random() * 100, // Random horizontal position (0-100%)
-        size: Math.random() * 20 + 16, // Random size between 16-36px
-        rotation: Math.random() * 360, // Random rotation (0-360deg)
-        duration: Math.random() * 2 + 3, // Random fall duration (3-5 seconds)
-        delay: Math.random() * 0.5, // Random delay (0-0.5 seconds)
+        id: heartId++,
+        left: Math.random() * 100,
+        size: Math.random() * 20 + 16,
+        rotation: Math.random() * 360,
+        duration: Math.random() * 4 + 6,
+        delay: Math.random() * 0.5, // 0-0.5s delay
+      });
+    }
+
+    // Set 2: 100 hearts - appear later (1-1.5s delay)
+    for (let i = 0; i < 100; i++) {
+      newHearts.push({
+        id: heartId++,
+        left: Math.random() * 100,
+        size: Math.random() * 20 + 16,
+        rotation: Math.random() * 360,
+        duration: Math.random() * 4 + 6,
+        delay: 1 + Math.random() * 0.5, // 1-1.5s delay
+      });
+    }
+
+    // Set 3: 50 hearts - appear even later (2-2.5s delay)
+    for (let i = 0; i < 50; i++) {
+      newHearts.push({
+        id: heartId++,
+        left: Math.random() * 100,
+        size: Math.random() * 20 + 16,
+        rotation: Math.random() * 360,
+        duration: Math.random() * 4 + 6,
+        delay: 2 + Math.random() * 0.5, // 2-2.5s delay
+      });
+    }
+
+    // Set 4: 25 hearts - final wave (3-3.5s delay)
+    for (let i = 0; i < 25; i++) {
+      newHearts.push({
+        id: heartId++,
+        left: Math.random() * 100,
+        size: Math.random() * 20 + 16,
+        rotation: Math.random() * 360,
+        duration: Math.random() * 4 + 6,
+        delay: 3 + Math.random() * 0.5, // 3-3.5s delay
       });
     }
 
@@ -58,11 +95,17 @@ export const FallingHearts: React.FC<FallingHeartsProps> = ({ onComplete }) => {
       const finalRotation = initialRotation + 360;
       styleElement.textContent = `
         @keyframes fall-${index} {
-          from {
-            transform: translateY(-50px) rotate(${initialRotation}deg);
+          0% {
+            transform: translateY(-56px) rotate(${initialRotation}deg);
             opacity: 1;
           }
-          to {
+          60% {
+            opacity: 0.8;
+          }
+          80% {
+            opacity: 0.4;
+          }
+          100% {
             transform: translateY(calc(100vh + 50px)) rotate(${finalRotation}deg);
             opacity: 0;
           }

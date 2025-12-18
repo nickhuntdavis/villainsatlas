@@ -7,7 +7,7 @@ import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
-import { AlertTriangle, Info, Heart, Scan } from 'lucide-react';
+import { AlertTriangle, Info, Heart, Scan, X } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
 import { typography, getThemeColors, fontFamily } from './ui/theme';
 
@@ -953,6 +953,9 @@ function App() {
 
   // The "N" button handler - fetches "Nick" from Baserow
   const handleNButton = useCallback(async () => {
+    // Trigger falling hearts animation
+    setShowFallingHearts(true);
+    
     setLoading(true);
     setError(null);
     setSelectedBuilding(null);
@@ -1146,6 +1149,16 @@ function App() {
           `}</style>
           <div className="absolute inset-0 bg-[#010E36]/80 z-30 flex items-center justify-center p-8 overflow-visible">
             <div className="max-w-lg w-auto bg-[#282C55] shadow-xl relative rounded-[32px] overflow-visible" style={{ padding: '48px' }}>
+               {/* Close button - top right */}
+               <button
+                 onClick={() => setFirstLoad(false)}
+                 className="absolute top-4 right-4 p-2 text-[#BAB2CF] hover:text-[#FDFEFF] transition-colors opacity-60 hover:opacity-100"
+                 aria-label="Close modal"
+                 title="Close"
+               >
+                 <X size={18} strokeWidth={2} aria-hidden="true" />
+               </button>
+               
                <div className="absolute right-12 top-[6.2rem] max-[530px]:hidden">
                  <img 
                    src="/images/palace.svg" 

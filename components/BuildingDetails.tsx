@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building, Coordinates } from '../types';
-import { X, MapPin, Navigation, ImageOff, User } from 'lucide-react';
+import { X, MapPin, Navigation, ImageOff, User, MessageCircle } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyle } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 
@@ -144,6 +144,20 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
         </div>
 
         <div className="mt-auto space-y-3">
+          {/* Message Nick button - only show for Nick */}
+          {building.name?.toLowerCase() === 'nick' && (
+            <a
+              href="https://t.me/ne1080p"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full py-4 bg-[#0088cc] text-white rounded-[12px] transition-all group hover:opacity-90 font-bold"
+              aria-label="Message Nick on Telegram"
+            >
+              <MessageCircle size={16} className="mr-2 text-white" strokeWidth={2.5} aria-hidden="true" />
+              Message Nick
+            </a>
+          )}
+          
           {(() => {
             // Build a strong search query that always includes the building name
             const nameAndLocationQuery = (
