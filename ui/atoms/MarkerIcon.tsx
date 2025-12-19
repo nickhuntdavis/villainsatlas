@@ -72,8 +72,9 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else if (isPrioritized) {
-    // Prioritized buildings get subtle glow only (no bounce)
+    // Prioritized buildings get subtle glow and are bigger (no bounce)
     // 150% bigger: 28px -> 42px, 36px -> 54px
+    // Glow uses the pin's style color (not pink)
     size = isSelected ? 54 : 42;
     animationClass = 'prioritized-glow';
     const glowColor = hexToRgba(color, 0.3);

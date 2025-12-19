@@ -20,11 +20,8 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   // Check if this is Palace of Culture and Science
   const isPalaceOfCulture = building.name === "Palace of Culture and Science";
   
-  // Prioritized buildings get magenta/pink pins
-  // For non-prioritized, use primary (first) style for color
-  const color = building.isPrioritized 
-    ? '#F265FF' // Magenta/pink
-    : getPrimaryStyleColor(building.style);
+  // Use primary (first) style for color - prioritized buildings are bigger and have glow but same color
+  const color = getPrimaryStyleColor(building.style);
 
   const handleClick = () => {
     // Trigger hearts animation on single click for Nick pin
