@@ -30,29 +30,54 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [shuffledMessages, setShuffledMessages] = useState<string[]>([]);
   
-  // Rotating loading messages
-  const loadingMessages = [
-    'searching sexy building archives...',
-    'searching dark web...',
-    'querying evil database...',
-    'parsing dark deco...',
-    'reticulating splines...',
-    'reminding Nastya that Nick loves her...'
+  // All loading messages
+  const allLoadingMessages = [
+    'Evaluating Beauty Thresholds',
+    'Rasterising City Skeletons',
+    'Calibrating Monumental Mass',
+    'Scanning for Structural Arrogance',
+    'Resolving Decorative Excess',
+    'Detecting Overengineered Confidence',
+    'Sorting Slavic Sensibilities',
+    'Cross-Referencing Vibes',
+    'Reminding Nastya the Nick is crazy about her',
+    'No really, Nick like "like" likes Nastya',
+    'Consulting the Lore',
+    'Reticulating Splines',
+    'Inverting Aesthetic Expectations',
+    'Searching building archives',
+    'Scraping Dark Web'
   ];
   
+  // Shuffle messages when loading starts
   useEffect(() => {
     if (isLoading && searchStatus !== 'idle') {
-      const interval = setInterval(() => {
-        setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
-      }, 1500); // Change message every 1.5 seconds
-      
-      return () => clearInterval(interval);
+      // Shuffle array using Fisher-Yates algorithm
+      const shuffled = [...allLoadingMessages];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setShuffledMessages(shuffled);
+      setLoadingMessageIndex(0);
     } else {
       setLoadingMessageIndex(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, searchStatus]);
+  
+  useEffect(() => {
+    if (isLoading && searchStatus !== 'idle' && shuffledMessages.length > 0) {
+      const interval = setInterval(() => {
+        setLoadingMessageIndex((prev) => (prev + 1) % shuffledMessages.length);
+      }, 2500); // Change message every 2.5 seconds (longer than before)
+      
+      return () => clearInterval(interval);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, searchStatus, shuffledMessages.length]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +175,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
       {/* Loading Status Text */}
       <StatusStrip
         theme={theme}
-        statusText={isLoading && searchStatus !== 'idle' ? loadingMessages[loadingMessageIndex] : (statusMessage || '')}
+        statusText={isLoading && searchStatus !== 'idle' && shuffledMessages.length > 0 ? shuffledMessages[loadingMessageIndex] : (statusMessage || '')}
         isVisible={(isLoading && searchStatus !== 'idle') || (!!statusMessage && !isLoading)}
       />
     </div>
