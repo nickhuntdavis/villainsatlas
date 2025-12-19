@@ -167,6 +167,49 @@ export const fetchAllBuildings = async (limitPages?: number): Promise<Building[]
   }
 };
 
+// Fetch all buildings from Baserow INCLUDING hidden ones (for duplicate checking)
+// This is used internally to check for duplicates before saving
+const fetchAllBuildingsIncludingHidden = async (limitPages?: number): Promise<Building[]> => {
+  try {
+    const allRows: any[] = [];
+    let page = 1;
+    const pageSize = 200;
+
+    while (true) {
+      const response = await fetch(
+        `${BASEROW_API_BASE}/${TABLE_ID}/?user_field_names=true&page=${page}&size=${pageSize}`,
+        {
+          headers: {
+            Authorization: `Token ${API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Baserow API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      allRows.push(...data.results);
+
+      // If limitPages is set and we've reached it, stop fetching
+      if (limitPages && page >= limitPages) {
+        break;
+      }
+
+      if (!data.next) break; // no more pages
+      page += 1;
+    }
+
+    // Don't filter out hidden buildings - return all for duplicate checking
+    return allRows.map(baserowRowToBuilding);
+  } catch (error) {
+    console.error("Error fetching from Baserow (including hidden):", error);
+    throw error;
+  }
+};
+
 // Fetch buildings near a location (within radius in meters)
 export const fetchBuildingsNearLocation = async (
   center: Coordinates,
@@ -337,9 +380,18 @@ const nameSimilarity = (name1: string, name2: string): number => {
 };
 
 // Check if building already exists and return the Baserow row ID if found (with fuzzy matching)
+// IMPORTANT: This checks ALL buildings including hidden ones to prevent re-adding duplicates
 export const findExistingBuilding = async (building: Building): Promise<{ exists: boolean; rowId?: number }> => {
   try {
-    const nearby = await fetchBuildingsNearLocation(building.coordinates, 1000); // 1km radius
+    // Fetch ALL buildings including hidden ones for duplicate checking
+    // This ensures we don't re-add buildings that were soft-deleted
+    const allBuildings = await fetchAllBuildingsIncludingHidden();
+    
+    // Filter to nearby buildings (within 1km) for performance
+    const nearby = allBuildings.filter((b) => {
+      const distance = getDistance(b.coordinates, building.coordinates);
+      return distance <= 1000; // 1km radius
+    });
     
     // First try exact name match
     let existing = nearby.find(
@@ -362,7 +414,9 @@ export const findExistingBuilding = async (building: Building): Promise<{ exists
       // Extract Baserow row ID from the building ID (format: "baserow-{id}")
       const rowIdMatch = existing.id.match(/^baserow-(\d+)$/);
       if (rowIdMatch) {
-        return { exists: true, rowId: parseInt(rowIdMatch[1], 10) };
+        const rowId = parseInt(rowIdMatch[1], 10);
+        console.log(`⚠️ Building "${building.name}" already exists in Baserow (row ID: ${rowId}) - skipping save`);
+        return { exists: true, rowId };
       }
     }
     

@@ -72,23 +72,23 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
-    // Purple heart icon with purple glow (similar to isPrioritized but with heart icon)
+    // Red heart icon with red glow (similar to isPrioritized but with heart icon)
     size = isSelected ? 42 : 32;
-    animationClass = 'purple-heart-glow';
-    const purpleColor = '#9873D3'; // Dark Deco purple
-    const purpleGlowColor = hexToRgba(purpleColor, 0.4);
+    animationClass = 'red-heart-glow';
+    const redColor = '#FF5D88'; // Same red as Nick's heart
+    const redGlowColor = hexToRgba(redColor, 0.4);
     glowStyle = `
       <style>
-        @keyframes purpleHeartGlow {
+        @keyframes redHeartGlow {
           0%, 100% {
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 4px ${purpleGlowColor}) drop-shadow(0 0 8px ${purpleGlowColor});
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 4px ${redGlowColor}) drop-shadow(0 0 8px ${redGlowColor});
           }
           50% {
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 6px ${purpleGlowColor}) drop-shadow(0 0 12px ${purpleGlowColor});
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 6px ${redGlowColor}) drop-shadow(0 0 12px ${redGlowColor});
           }
         }
-        .purple-heart-glow {
-          animation: purpleHeartGlow 2s ease-in-out infinite;
+        .red-heart-glow {
+          animation: redHeartGlow 2s ease-in-out infinite;
         }
       </style>
     `;
@@ -139,8 +139,8 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </div>
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
-    // Purple heart icon with purple glow
-    const heartColor = '#9873D3'; // Dark Deco purple
+    // Red heart icon with red glow
+    const heartColor = '#FF5D88'; // Same red as Nick's heart
     html = `
       ${glowStyle}
       <div class="${animationClass}" style="
