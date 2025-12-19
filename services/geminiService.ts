@@ -116,8 +116,10 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
        - Brutalist: Brutalism, New Brutalism, Concrete Brutalism, Raw Concrete
        - Deco: Dark Deco, Art Deco, Streamlined Moderne, Gothic Deco
        - Gothic: Gothic Revival, Neo-Gothic, Victorian Gothic, Industrial Gothic
+       - Cathedral: Cathedral (for cathedrals specifically)
        - Other Menacing: Totalitarian, Fascist Architecture, Monumental, Fortress, Bunker, Cyberpunk, Dystopian
        - Use the most accurate style name, even if it's a variant or synonym. Style naming is subjective - choose what best describes the building.
+       - If a building has multiple distinct architectural styles, list them comma-separated (e.g., "Cathedral, Gothic Revival"). The first style is the primary style used for color coding.
     3. AESTHETIC: Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING. Think buildings that look like supervillain headquarters, dystopian government facilities, or dark citadels.
     4. RARITY: These are exceptional, noteworthy buildings. If a city has 5-8 qualifying buildings, you're being too lenient. Most cities will have 0-3 at most.
     
@@ -140,7 +142,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
        - "city" (string, city name only)
        - "country" (string, country name only)
        - "description" (string, short, evocative, noir-style - emphasize the imposing/scary nature)
-       - "style" (string - use any appropriate style name from: Stalinist Gothic, Soviet Modernism, Socialist Classicism, Brutalism, New Brutalism, Dark Deco, Art Deco, Gothic Revival, Neo-Gothic, Totalitarian, Fascist Architecture, Monumental, Fortress, Industrial Gothic, Cyberpunk, Dystopian, or any other accurate variant/synonym. Style naming is subjective - use what best describes the building.)
+       - "style" (string - use comma-separated styles if the building has multiple architectural styles. For example: "Cathedral, Gothic Revival" or "Brutalism, Soviet Modernism". Use any appropriate style name from: Stalinist Gothic, Soviet Modernism, Socialist Classicism, Brutalism, New Brutalism, Dark Deco, Art Deco, Gothic Revival, Neo-Gothic, Cathedral, Totalitarian, Fascist Architecture, Monumental, Fortress, Industrial Gothic, Cyberpunk, Dystopian, or any other accurate variant/synonym. Style naming is subjective - use what best describes the building. The first style listed will be considered the primary style.)
        - "isPrioritized" (boolean, optional - true for historically significant Art Deco buildings by famous architects)
        - "architect" (string, optional - name of architect if well-known, e.g., "William Van Alen", "Shreve, Lamb & Harmon")
        - "lat" (number, latitude)
@@ -159,8 +161,9 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
   REQUIREMENTS (for non-prioritized buildings):
   - Must be LARGE-SCALE, monumental structures (think skyscrapers, massive government buildings, enormous complexes)
   - Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING
-  - Architectural styles: Accept Soviet/Communist styles (Stalinist Gothic, Soviet Modernism, etc.), Brutalism variants, Deco variants (Dark Deco, Art Deco), Gothic variants, or other menacing styles (Totalitarian, Monumental, Fortress, Cyberpunk, Dystopian, etc.)
+  - Architectural styles: Accept Soviet/Communist styles (Stalinist Gothic, Soviet Modernism, etc.), Brutalism variants, Deco variants (Dark Deco, Art Deco), Gothic variants, Cathedral, or other menacing styles (Totalitarian, Monumental, Fortress, Cyberpunk, Dystopian, etc.)
   - Use the most accurate style name - style naming is subjective, so use variants/synonyms as appropriate
+  - If a building has multiple distinct architectural styles, list them comma-separated (e.g., "Cathedral, Gothic Revival" or "Brutalism, Soviet Modernism"). The first style will be the primary style.
   - Reference: Think r/evilbuildings - Polish Palace of Culture and Science level of imposing
   
   Ensure they are real places using Google Maps data. 
@@ -633,5 +636,289 @@ export const fetchImageForBuilding = async (building: Building): Promise<Buildin
   } catch (err) {
     console.warn(`Error fetching image for "${building.name}":`, err);
     return building;
+  }
+};
+
+// Detect if a query is a specific POI name vs a location
+// POI names typically have quotes, "The", specific building names, etc.
+export const isPOIQuery = (query: string): boolean => {
+  const normalized = query.trim();
+  
+  // If query has quotes, it's likely a specific POI
+  if (normalized.includes('"') || normalized.includes("'")) {
+    return true;
+  }
+  
+  // Common POI indicators
+  const poiIndicators = [
+    /^(the|a|an)\s+/i, // Starts with "The", "A", "An"
+    /\b(building|tower|palace|monument|center|centre|hall|theater|theatre|museum|library|cathedral|church|temple|gate|gates|bridge|station)\b/i, // Contains building-related words
+  ];
+  
+  // Check if query matches POI patterns
+  const hasPOIIndicators = poiIndicators.some(pattern => pattern.test(normalized));
+  
+  // If it's short and has POI indicators, likely a POI
+  if (normalized.length < 50 && hasPOIIndicators) {
+    return true;
+  }
+  
+  // If it's very short (likely a specific name), check for capitalization patterns
+  if (normalized.length < 30) {
+    const words = normalized.split(/\s+/);
+    // If multiple words are capitalized (proper noun pattern), likely a POI
+    const capitalizedWords = words.filter(w => /^[A-Z]/.test(w));
+    if (capitalizedWords.length >= 2) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+// Search for a specific POI using Google Places API
+export const searchPOIByName = async (poiName: string): Promise<Building | null> => {
+  const mapsApiKey =
+    (typeof import.meta !== "undefined" &&
+      ((import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
+        (import.meta as any).env?.GOOGLE_MAPS_API_KEY ||
+        (import.meta as any).env?.REACT_APP_GOOGLE_MAPS_API_KEY)) ||
+    (process.env.VITE_GOOGLE_MAPS_API_KEY ||
+     process.env.GOOGLE_MAPS_API_KEY ||
+     process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
+
+  if (!mapsApiKey) {
+    console.warn("⚠️ No Google Maps API key found, cannot search for POI");
+    return null;
+  }
+
+  try {
+    // Use proxy endpoint to avoid CORS issues
+    const apiBaseUrl = getApiBaseUrl();
+    const findUrl = `${apiBaseUrl}/api/places/find?input=${encodeURIComponent(poiName)}&inputtype=textquery&fields=place_id,formatted_address,geometry,name`;
+    
+    const res = await fetch(findUrl);
+    if (!res.ok) {
+      console.warn(`Places Find API error: ${res.status} ${res.statusText}`);
+      return null;
+    }
+
+    const data = await res.json();
+    if (data.status !== 'OK' || !data.candidates || data.candidates.length === 0) {
+      console.warn(`No candidates found for POI: "${poiName}"`);
+      return null;
+    }
+
+    const candidate = data.candidates[0];
+    const placeId = candidate.place_id;
+    const name = candidate.name || poiName;
+    const formattedAddress = candidate.formatted_address || '';
+    
+    // Get coordinates
+    const location = candidate.geometry?.location;
+    if (!location || !location.lat || !location.lng) {
+      console.warn(`No coordinates found for POI: "${poiName}"`);
+      return null;
+    }
+
+    // Now get details including photos
+    const detailsUrl = `${apiBaseUrl}/api/places/details?place_id=${encodeURIComponent(placeId)}&fields=place_id,formatted_address,address_components,geometry,photos,types,url`;
+    
+    const detailsRes = await fetch(detailsUrl);
+    if (!detailsRes.ok) {
+      console.warn(`Places Details API error: ${detailsRes.status} ${detailsRes.statusText}`);
+      // Still return basic building info even if details fail
+      return {
+        id: `poi-${placeId}`,
+        name,
+        location: formattedAddress,
+        description: '',
+        coordinates: { lat: location.lat, lng: location.lng },
+        googlePlaceId: placeId,
+        gmapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeId}`,
+      };
+    }
+
+    const detailsData = await detailsRes.json();
+    if (detailsData.status !== 'OK' || !detailsData.result) {
+      console.warn(`Places Details non-OK for "${poiName}":`, detailsData.status);
+      return {
+        id: `poi-${placeId}`,
+        name,
+        location: formattedAddress,
+        description: '',
+        coordinates: { lat: location.lat, lng: location.lng },
+        googlePlaceId: placeId,
+        gmapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeId}`,
+      };
+    }
+
+    const result = detailsData.result;
+    
+    // Extract city and country from address components
+    let city = '';
+    let country = '';
+    if (result.address_components) {
+      for (const component of result.address_components) {
+        if (component.types.includes('locality') || component.types.includes('postal_town')) {
+          city = component.long_name;
+        }
+        if (component.types.includes('country')) {
+          country = component.long_name;
+        }
+      }
+    }
+
+    // Get image URL from photos if available
+    let imageUrl: string | undefined = undefined;
+    if (result.photos && result.photos.length > 0) {
+      const photoRef = result.photos[0].photo_reference;
+      if (photoRef) {
+        imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(photoRef)}&key=${mapsApiKey}`;
+      }
+    }
+
+    const finalLocation = result.formatted_address || formattedAddress;
+    const finalCoords = result.geometry?.location || location;
+
+    return {
+      id: `poi-${placeId}`,
+      name: result.name || name,
+      location: finalLocation,
+      description: '',
+      city: city || undefined,
+      country: country || undefined,
+      coordinates: { lat: finalCoords.lat, lng: finalCoords.lng },
+      googlePlaceId: placeId,
+      gmapsUrl: result.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeId}`,
+      imageUrl,
+    };
+  } catch (err) {
+    console.error(`Error searching for POI "${poiName}":`, err);
+    return null;
+  }
+};
+
+// Helper to extract JSON object from potentially markdown-formatted text
+const extractJsonObject = (str: string): string => {
+  // Finds the first '{' and the last '}'
+  const firstOpen = str.indexOf('{');
+  const lastClose = str.lastIndexOf('}');
+  
+  if (firstOpen !== -1 && lastClose !== -1 && firstOpen < lastClose) {
+    return str.substring(firstOpen, lastClose + 1);
+  }
+  return "{}";
+};
+
+// Check with Gemini if a POI matches the style criteria
+export const checkPOIStyleCriteria = async (building: Building): Promise<{ matches: boolean; building?: Building }> => {
+  if (!process.env.API_KEY) {
+    console.error("API Key is missing");
+    return { matches: false };
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const systemInstruction = `
+    You are 'The Archivist', a curator for "The Villain's Atlas". 
+    Your mission is to identify ONLY the most extreme, imposing, and architecturally menacing buildings in the world.
+    
+    CRITICAL SELECTION CRITERIA:
+    
+    PRIORITY 1 - ART DECO MASTERPIECES:
+    - Historically significant Art Deco buildings by well-known architects (e.g., Empire State Building, Chrysler Building, Rockefeller Center).
+    - These should be included even if they don't meet all other criteria (they can be slightly less "evil" if historically significant).
+    - Mark these with "isPrioritized": true and include "architect" name if well-known.
+    
+    PRIORITY 2 - OTHER QUALIFYING BUILDINGS:
+    1. SIZE & SCALE: Buildings must be LARGE-SCALE, monumental structures. Think skyscrapers, massive government buildings, enormous brutalist complexes. Small buildings do NOT qualify.
+    2. ARCHITECTURAL STYLES - Accept any of these or their common synonyms/variants:
+       - Soviet/Communist: Stalinist Gothic, Soviet Modernism, Socialist Classicism, Soviet Brutalism
+       - Brutalist: Brutalism, New Brutalism, Concrete Brutalism, Raw Concrete
+       - Deco: Dark Deco, Art Deco, Streamlined Moderne, Gothic Deco
+       - Gothic: Gothic Revival, Neo-Gothic, Victorian Gothic, Industrial Gothic
+       - Cathedral: Cathedral (for cathedrals specifically)
+       - Other Menacing: Totalitarian, Fascist Architecture, Monumental, Fortress, Bunker, Cyberpunk, Dystopian
+       - If a building has multiple distinct architectural styles, list them comma-separated (e.g., "Cathedral, Gothic Revival"). The first style is the primary style.
+    3. AESTHETIC: Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING. Think buildings that look like supervillain headquarters, dystopian government facilities, or dark citadels.
+    4. RARITY: These are exceptional, noteworthy buildings.
+    
+    REJECT IF:
+    - Building is small or medium-sized (only large-scale structures)
+    - Building is "pretty", "quaint", or aesthetically pleasing
+    - Building is modern glass/steel (unless it's a massive brutalist exception)
+    - Building is residential (unless it's a massive housing complex with imposing architecture)
+    - Building is common or unremarkable
+    
+    REFERENCE: Think r/evilbuildings on Reddit. The Polish Palace of Culture and Science is a PERFECT example.
+    
+    CRITICAL OUTPUT INSTRUCTIONS:
+    1. You MUST return a VALID JSON object with:
+       - "matches" (boolean) - true if the building matches criteria, false otherwise
+       - "building" (object, optional) - if matches is true, include enriched building data with:
+         - "name" (string)
+         - "location" (string, full address)
+         - "city" (string, city name only)
+         - "country" (string, country name only)
+         - "description" (string, short, evocative, noir-style)
+         - "style" (string - use comma-separated styles if multiple apply, e.g., "Cathedral, Gothic Revival". The first style is the primary style.)
+         - "isPrioritized" (boolean, optional)
+         - "architect" (string, optional)
+         - "lat" (number)
+         - "lng" (number)
+    2. Do NOT include Markdown code blocks (like \`\`\`json).
+    3. Do NOT include conversational text.
+  `;
+
+  const prompt = `Evaluate this building: "${building.name}" at ${building.location || `${building.city || ''}, ${building.country || ''}`}.
+  
+  Does this building match the criteria for "The Villain's Atlas"? 
+  
+  Requirements:
+  - Must be LARGE-SCALE, monumental structures
+  - Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING
+  - Architectural styles: Soviet/Communist styles, Brutalism variants, Deco variants, Gothic variants, or other menacing styles
+  - Reference: Think r/evilbuildings - Polish Palace of Culture and Science level of imposing
+  
+  Return JSON with "matches" (boolean) and if matches is true, include enriched "building" object with all required fields.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash-exp",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+      },
+    });
+
+    const responseText = response.text || "{}";
+    const jsonStr = extractJsonObject(responseText);
+    const parsed = JSON.parse(jsonStr);
+
+    if (parsed.matches === true && parsed.building) {
+      // Merge the enriched building data with the original building
+      const enrichedBuilding: Building = {
+        ...building,
+        name: parsed.building.name || building.name,
+        location: parsed.building.location || building.location,
+        city: parsed.building.city || building.city,
+        country: parsed.building.country || building.country,
+        description: parsed.building.description || building.description,
+        style: parsed.building.style as ArchitecturalStyle || building.style,
+        isPrioritized: parsed.building.isPrioritized || building.isPrioritized,
+        architect: parsed.building.architect || building.architect,
+        coordinates: parsed.building.lat && parsed.building.lng
+          ? { lat: parsed.building.lat, lng: parsed.building.lng }
+          : building.coordinates,
+      };
+
+      return { matches: true, building: enrichedBuilding };
+    }
+
+    return { matches: false };
+  } catch (err) {
+    console.error("Error checking POI style criteria:", err);
+    return { matches: false };
   }
 };

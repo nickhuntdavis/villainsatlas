@@ -50,9 +50,31 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
         }
       </style>
     `;
+  } else if (variant === 'nick') {
+    // Nick heart icon with subtle glow
+    size = isSelected ? 32 : 24;
+    animationClass = 'nick-glow';
+    const nickColor = '#FF5D88';
+    const nickGlowColor = hexToRgba(nickColor, 0.3);
+    glowStyle = `
+      <style>
+        @keyframes nickGlow {
+          0%, 100% {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 3px ${nickGlowColor}) drop-shadow(0 0 6px ${nickGlowColor});
+          }
+          50% {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 4px ${nickGlowColor}) drop-shadow(0 0 8px ${nickGlowColor});
+          }
+        }
+        .nick-glow {
+          animation: nickGlow 2s ease-in-out infinite;
+        }
+      </style>
+    `;
   } else if (isPrioritized) {
     // Prioritized buildings get subtle glow only (no bounce)
-    size = isSelected ? 36 : 28;
+    // 150% bigger: 28px -> 42px, 36px -> 54px
+    size = isSelected ? 54 : 42;
     animationClass = 'prioritized-glow';
     const glowColor = hexToRgba(color, 0.3);
     glowStyle = `
@@ -80,6 +102,7 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     // Heart icon for Nick and Palace of Culture - both use same color
     const heartColor = '#FF5D88';
     html = `
+      ${glowStyle || sparkleStyle || ''}
       <div class="${animationClass}" style="
         width: ${size}px;
         height: ${size}px;
@@ -92,7 +115,6 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
       </div>
-      ${sparkleStyle || ''}
     `;
   } else {
     // Standard sharp, angular pin shape (flipped upside down)

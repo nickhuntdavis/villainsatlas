@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Building, Coordinates } from '../types';
 import { X, MapPin, Navigation, ImageOff, User, MessageCircle } from 'lucide-react';
-import { GENRE_COLORS, normalizeStyle } from '../constants';
+import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 
 interface BuildingDetailsProps {
@@ -63,8 +63,9 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
   // Extract clean image URL (handle markdown format)
   const cleanImageUrl = extractUrlFromMarkdown(building.imageUrl);
 
-  const normalizedStyle = building.style ? normalizeStyle(building.style) : 'Other';
-  const styleColor = GENRE_COLORS[normalizedStyle] || GENRE_COLORS['Other'];
+  // Parse multiple styles (comma-separated) and get primary style color
+  const styles = building.style ? normalizeStyles(building.style) : ['Other'];
+  const styleColor = getPrimaryStyleColor(building.style);
 
   return (
     <aside
@@ -92,8 +93,28 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
       <div className="p-8 flex flex-col flex-1">
         {building.style && (
         <div className="flex justify-between items-start mb-6">
-          <div className="bg-[#282C55] rounded-[4px] px-3 py-1.5 inline-block">
-            <span className="text-white text-sm font-medium">{building.style}</span>
+          <div className="flex flex-wrap gap-2">
+            {styles.map((style, index) => {
+              const normalizedStyle = style;
+              const tagColorHex = GENRE_COLORS[normalizedStyle] || GENRE_COLORS['Other'];
+              // Convert hex to rgba with 20% opacity
+              const hexToRgba = (hex: string, opacity: number) => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+              };
+              const tagColor = hexToRgba(tagColorHex, 0.2);
+              return (
+                <div
+                  key={index}
+                  className="rounded-[4px] px-3 py-1.5 inline-block"
+                  style={{ backgroundColor: tagColor }}
+                >
+                  <span className="text-white text-sm font-medium">{style}</span>
+                </div>
+              );
+            })}
           </div>
           <button
             onClick={onClose}

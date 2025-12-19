@@ -70,11 +70,9 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     ? `${row.city}, ${row.country}` 
     : row.city || row.country || "Unknown Location");
 
-  // Use is_prioritized from Baserow if available, otherwise derive from style + architect
-  const isPrioritized = row.is_prioritized !== undefined 
-    ? row.is_prioritized 
-    : (row.style?.toLowerCase().includes('art deco') && 
-       (row.architect || row.notes?.toLowerCase().includes('famous') || row.notes?.toLowerCase().includes('historic')));
+  // Use is_prioritized from Baserow - only trust explicit value, don't derive
+  // This ensures only buildings explicitly marked as prioritized get the special styling
+  const isPrioritized = row.is_prioritized === true;
 
   // Extract image URL from markdown format if present
   const rawImageUrl = extractUrlFromMarkdown(row.image_url);
@@ -437,10 +435,18 @@ export const dedupeBaserowBuildings = async (): Promise<number[]> => {
         if (processed.has(allBuildings[j].id)) continue;
 
         // Check if buildings are likely the same
+        // Require higher similarity (0.75) OR exact normalized name match for better accuracy
         const nameSim = nameSimilarity(allBuildings[i].name, allBuildings[j].name);
-        if (nameSim >= 0.6) {
+        const normalized1 = normalizeNameForMatch(allBuildings[i].name);
+        const normalized2 = normalizeNameForMatch(allBuildings[j].name);
+        const exactMatch = normalized1 === normalized2;
+        
+        // Require higher similarity threshold (0.75) OR exact match, and closer distance (300m)
+        // This makes dedupe less aggressive to avoid false positives
+        if (nameSim >= 0.75 || exactMatch) {
           const distance = getDistance(allBuildings[i].coordinates, allBuildings[j].coordinates);
-          if (distance < 500) {
+          // Stricter distance: 300m instead of 500m to reduce false matches
+          if (distance < 300) {
             group.push(allBuildings[j]);
             processed.add(allBuildings[j].id);
           }
@@ -461,6 +467,12 @@ export const dedupeBaserowBuildings = async (): Promise<number[]> => {
     const deletedIds: number[] = [];
 
     for (const group of duplicateGroups) {
+      // Log the duplicate group for debugging
+      console.log(`\n🔍 Duplicate group (${group.length} buildings):`);
+      group.forEach((b, idx) => {
+        console.log(`  ${idx + 1}. "${b.name}" at ${b.location || `${b.city || ''}, ${b.country || ''}`} (ID: ${b.id})`);
+      });
+
       // Score each building in the group
       const scored = group.map((b) => ({
         building: b,
@@ -472,6 +484,9 @@ export const dedupeBaserowBuildings = async (): Promise<number[]> => {
 
       const keep = scored[0].building;
       const toDelete = scored.slice(1);
+
+      console.log(`  ✅ Keeping: "${keep.name}" (score: ${scored[0].score.toFixed(1)})`);
+      console.log(`  🗑️  Deleting ${toDelete.length} duplicate(s):`);
 
       for (const item of toDelete) {
         // Extract Baserow row ID from the building ID (format: "baserow-{id}")
@@ -491,7 +506,7 @@ export const dedupeBaserowBuildings = async (): Promise<number[]> => {
 
             if (deleteRes.ok) {
               deletedIds.push(rowId);
-              console.log(`🗑️ Deleted duplicate: "${item.building.name}" (row ID: ${rowId})`);
+              console.log(`    🗑️ Deleted: "${item.building.name}" (score: ${item.score.toFixed(1)}, row ID: ${rowId})`);
               // Small delay to avoid rate limits
               await new Promise(resolve => setTimeout(resolve, 300));
             } else {

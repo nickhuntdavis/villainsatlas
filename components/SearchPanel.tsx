@@ -132,7 +132,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             <Crosshair size={16} className={locationPermissionDenied && navigator.geolocation ? "text-[#CDBAFF]/40" : "text-[#CDBAFF]"} aria-hidden="true" />
             <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Nearest</span>
           </button>
-          
+
           <button
             type="button"
             onClick={onSearchArea}

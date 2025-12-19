@@ -37,6 +37,7 @@ export enum ArchitecturalStyle {
   INDUSTRIAL_GOTHIC = 'Industrial Gothic',
   CYBERPUNK = 'Cyberpunk',
   DYSTOPIAN = 'Dystopian',
+  CATHEDRAL = 'Cathedral',
   
   // Fallback
   OTHER = 'Other'

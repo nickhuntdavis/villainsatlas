@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import { Building, ArchitecturalStyle } from '../types';
-import { GENRE_COLORS, normalizeStyle } from '../constants';
+import { getPrimaryStyleColor } from '../constants';
 import { createMarkerIcon } from '../ui/atoms/MarkerIcon';
 
 interface BuildingMarkerProps {
@@ -20,10 +20,11 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   // Check if this is Palace of Culture and Science
   const isPalaceOfCulture = building.name === "Palace of Culture and Science";
   
-  // Prioritized buildings get orange/coral pins
+  // Prioritized buildings get magenta/pink pins
+  // For non-prioritized, use primary (first) style for color
   const color = building.isPrioritized 
-    ? '#FF8052' // Orange/coral from palette
-    : (building.style ? (GENRE_COLORS[normalizeStyle(building.style)] || GENRE_COLORS['Other']) : GENRE_COLORS['Other']);
+    ? '#F265FF' // Magenta/pink
+    : getPrimaryStyleColor(building.style);
 
   const handleClick = () => {
     // Trigger hearts animation on single click for Nick pin

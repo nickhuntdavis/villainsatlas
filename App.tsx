@@ -8,9 +8,12 @@ const BuildingDetails = lazy(() =>
 const FallingHearts = lazy(() => 
   import('./components/FallingHearts').then(module => ({ default: module.FallingHearts }))
 );
+const POIConfirmationModal = lazy(() => 
+  import('./components/POIConfirmationModal').then(module => ({ default: module.POIConfirmationModal }))
+);
 import { Building, Coordinates } from './types';
-import { fetchLairs, geocodeLocation, fetchImageForBuilding } from './services/geminiService';
-import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings } from './services/baserowService';
+import { fetchLairs, geocodeLocation, fetchImageForBuilding, isPOIQuery, searchPOIByName, checkPOIStyleCriteria } from './services/geminiService';
+import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan, X } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
@@ -36,6 +39,7 @@ function App() {
   });
   const [showFallingHearts, setShowFallingHearts] = useState(false);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const [poiConfirmationBuilding, setPOIConfirmationBuilding] = useState<Building | null>(null);
   const [blacklistedBuildingIds, setBlacklistedBuildingIds] = useState<Set<number>>(() => {
     // Load blacklisted IDs from localStorage
     if (typeof window !== 'undefined') {
@@ -62,6 +66,11 @@ function App() {
   // Ref for backfill images button double-click detection
   const backfillClickCountRef = useRef(0);
   const backfillClickTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for force Gemini search button double-click detection
+  const forceGeminiClickCountRef = useRef(0);
+  const forceGeminiClickTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Store last search query for force Gemini
+  const lastSearchQueryRef = useRef<string>('');
 
   // Persist theme and expose as data attribute for potential global styling
   useEffect(() => {
@@ -223,7 +232,19 @@ function App() {
           const distance = getDistance(center, b.coordinates);
           return distance <= radiusMeters;
         });
+        
+        // If no results found in cache, fetch from API for this area
+        if (results.length === 0) {
+          console.log(`No buildings in cache for this area, fetching from API...`);
+          const fresh = await fetchBuildingsNearLocation(center, radiusMeters);
+          if (fresh.length > 0) {
+            // Add to cache
+            setAllBaserowBuildings((prev) => mergeBuildings(prev, fresh));
+            results = fresh;
+          }
+        }
       } else {
+        // Cache is empty, fetch from API
         const fresh = await fetchBuildingsNearLocation(center, radiusMeters);
         if (fresh.length > 0) {
           setAllBaserowBuildings((prev) => mergeBuildings(prev, fresh));
@@ -718,6 +739,9 @@ function App() {
   }, [buildings, userLocation, center, searchAndFindNearest, findNearestBuilding, locationPermissionDenied]);
 
   const handleSearch = async (query: string) => {
+    // Store the query for force Gemini button
+    lastSearchQueryRef.current = query;
+    
     setLoading(true);
     setError(null);
     setSelectedBuilding(null);
@@ -728,6 +752,61 @@ function App() {
     let statusMessage: string | null = null;
     
     try {
+      // Check if this is a POI-specific search
+      if (isPOIQuery(query)) {
+        console.log(`🔍 Detected POI query: "${query}"`);
+        setSearchStatus('searching_gemini');
+        
+        // Search for the POI using Google Places
+        const poiBuilding = await searchPOIByName(query);
+        
+        if (!poiBuilding) {
+          setLoading(false);
+          setError(`Could not find "${query}"`);
+          return;
+        }
+        
+        // Check if it matches style criteria
+        const styleCheck = await checkPOIStyleCriteria(poiBuilding);
+        
+        if (styleCheck.matches && styleCheck.building) {
+          // Matches criteria - add it automatically
+          const enrichedBuilding = styleCheck.building;
+          
+          // Check if it already exists in Baserow
+          const existing = await fetchBuildingByName(enrichedBuilding.name);
+          if (existing && existing.length > 0) {
+            // Already exists - just show it
+            setBuildings((prev) => mergeBuildings(prev, existing));
+            setCenter(enrichedBuilding.coordinates);
+            setLoading(false);
+            setStatusMessage(`Found "${enrichedBuilding.name}" in database`);
+            return;
+          }
+          
+          // Save to Baserow
+          try {
+            const savedBuilding = await saveBuildingToBaserow(enrichedBuilding);
+            console.log(`✅ Saved POI "${savedBuilding.name}" to Baserow`);
+            
+            // Add to map
+            setBuildings((prev) => mergeBuildings(prev, [savedBuilding]));
+            setCenter(savedBuilding.coordinates);
+            setLoading(false);
+            setStatusMessage(`Added "${savedBuilding.name}" to database`);
+          } catch (saveErr) {
+            console.error(`Failed to save POI "${enrichedBuilding.name}":`, saveErr);
+            setError(`Found "${enrichedBuilding.name}" but failed to save`);
+            setLoading(false);
+          }
+        } else {
+          // Doesn't match criteria - show confirmation modal
+          setPOIConfirmationBuilding(poiBuilding);
+          setLoading(false);
+        }
+        return;
+      }
+      
       // First, geocode the location to get coordinates (using Nominatim - free, no API limits)
       geocodedCoords = await geocodeLocation(query);
       
@@ -1126,6 +1205,95 @@ function App() {
     }
   }, [filterBlacklistedBuildings]);
 
+  // Handler for force Gemini search button double-click - bypasses 5 building limit
+  const handleForceGeminiSearchClick = useCallback(async () => {
+    forceGeminiClickCountRef.current += 1;
+    
+    // Clear existing timer
+    if (forceGeminiClickTimerRef.current) {
+      clearTimeout(forceGeminiClickTimerRef.current);
+    }
+    
+    // If we've reached 2 clicks, trigger force Gemini search
+    if (forceGeminiClickCountRef.current >= 2) {
+      forceGeminiClickCountRef.current = 0;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        setSelectedBuilding(null);
+        setStatusMessage("Force searching with Gemini...");
+        
+        // Use last search query or current map center
+        const query = lastSearchQueryRef.current || "buildings";
+        
+        // Get current map center
+        const currentCenter = center;
+        
+        if (!currentCenter) {
+          setError("Unable to determine map location.");
+          setLoading(false);
+          return;
+        }
+        
+        setSearchStatus('searching_gemini');
+        console.log(`🔍 Force Gemini search for "${query}" at ${currentCenter.lat}, ${currentCenter.lng}`);
+        
+        // Call Gemini directly, bypassing the 5 building check
+        const geminiResults = await fetchLairs(query, currentCenter.lat, currentCenter.lng);
+        
+        if (geminiResults.length > 0) {
+          // Enrich with images
+          const geminiResultsNeedingImages = geminiResults.filter(b => b.googlePlaceId && !b.imageUrl);
+          if (geminiResultsNeedingImages.length > 0) {
+            console.log(`🖼️ Enriching ${geminiResultsNeedingImages.length} Gemini results with images...`);
+            const enrichedGeminiResults = await Promise.all(
+              geminiResultsNeedingImages.map(b => fetchImageForBuilding(b))
+            );
+            
+            // Update results with enriched images
+            const enrichedMap = new Map(enrichedGeminiResults.map(b => [b.id, b]));
+            geminiResults.forEach((b, idx) => {
+              const enriched = enrichedMap.get(b.id);
+              if (enriched) {
+                geminiResults[idx] = enriched;
+              }
+            });
+          }
+          
+          // Merge with existing buildings
+          const mergedBuildings = mergeBuildings(buildings, geminiResults);
+          setBuildings(mergedBuildings);
+          setAllBaserowBuildings(prev => mergeBuildings(prev, geminiResults));
+          
+          setStatusMessage(`Found ${geminiResults.length} buildings via Gemini`);
+          console.log(`✅ Force Gemini search complete: ${geminiResults.length} buildings found`);
+        } else {
+          setStatusMessage("No buildings found via Gemini.");
+        }
+      } catch (err: any) {
+        console.error("Error in force Gemini search:", err);
+        const isRateLimit = err?.isRateLimit || 
+                           err?.message?.includes('rate limit') || 
+                           err?.message?.includes('quota');
+        
+        if (isRateLimit) {
+          setError("SYSTEM ALERT\nToo many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
+        } else {
+          setError(`Force Gemini search failed: ${err?.message || 'Unknown error'}`);
+        }
+      } finally {
+        setLoading(false);
+        setSearchStatus('idle');
+      }
+    } else {
+      // Reset counter after 1 second if no more clicks
+      forceGeminiClickTimerRef.current = setTimeout(() => {
+        forceGeminiClickCountRef.current = 0;
+      }, 1000);
+    }
+  }, [center, buildings]);
+
   // Handler for backfill images button double-click
   const handleBackfillImagesButtonClick = useCallback(async () => {
     backfillClickCountRef.current += 1;
@@ -1272,10 +1440,20 @@ function App() {
         }
         .backfill-button {
           bottom: calc(1rem + 16px) !important;
-          right: calc(1rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
+          right: calc(1rem + 12px + 4px + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) + force gemini button width (12px) + gap (4px) */
         }
         @media (min-width: 768px) {
           .backfill-button {
+            bottom: calc(1.5rem + 16px) !important;
+            right: calc(1.5rem + 12px + 4px + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) + force gemini button width (12px) + gap (4px) */
+          }
+        }
+        .force-gemini-button {
+          bottom: calc(1rem + 16px) !important;
+          right: calc(1rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
+        }
+        @media (min-width: 768px) {
+          .force-gemini-button {
             bottom: calc(1.5rem + 16px) !important;
             right: calc(1.5rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
           }
@@ -1438,6 +1616,21 @@ function App() {
         <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
       </div>
 
+      {/* Subtle force Gemini search button - bottom right (left of backfill) */}
+      <button
+        onClick={handleForceGeminiSearchClick}
+        className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 force-gemini-button"
+        style={{ 
+          width: '12px', 
+          height: '12px', 
+          opacity: 0.08
+        }}
+        aria-label="Force Gemini search (double-click)"
+        title="Double-click to force Gemini search (bypasses 5 building limit)"
+      >
+        <div className="w-full h-full bg-white rounded-sm" />
+      </button>
+
       {/* Subtle backfill images button - bottom right (left of dedupe) */}
       <button
         onClick={handleBackfillImagesButtonClick}
@@ -1472,6 +1665,50 @@ function App() {
       {showFallingHearts && (
         <Suspense fallback={null}>
           <FallingHearts onComplete={() => setShowFallingHearts(false)} />
+        </Suspense>
+      )}
+
+      {/* POI Confirmation Modal */}
+      {poiConfirmationBuilding && (
+        <Suspense fallback={null}>
+          <POIConfirmationModal
+            building={poiConfirmationBuilding}
+            theme={theme}
+            onConfirm={async () => {
+              const building = poiConfirmationBuilding;
+              setPOIConfirmationBuilding(null);
+              setLoading(true);
+              
+              try {
+                // Check if it already exists
+                const existing = await fetchBuildingByName(building.name);
+                if (existing && existing.length > 0) {
+                  setBuildings((prev) => mergeBuildings(prev, existing));
+                  setCenter(building.coordinates);
+                  setLoading(false);
+                  setStatusMessage(`Found "${building.name}" in database`);
+                  return;
+                }
+                
+                // Save to Baserow
+                const savedBuilding = await saveBuildingToBaserow(building);
+                console.log(`✅ Saved POI "${savedBuilding.name}" to Baserow`);
+                
+                // Add to map
+                setBuildings((prev) => mergeBuildings(prev, [savedBuilding]));
+                setCenter(savedBuilding.coordinates);
+                setLoading(false);
+                setStatusMessage(`Added "${savedBuilding.name}" to database`);
+              } catch (err) {
+                console.error(`Failed to save POI "${building.name}":`, err);
+                setError(`Failed to save "${building.name}"`);
+                setLoading(false);
+              }
+            }}
+            onCancel={() => {
+              setPOIConfirmationBuilding(null);
+            }}
+          />
         </Suspense>
       )}
 
