@@ -80,6 +80,19 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
   // This ensures images like Nick's can display even if not from Google Places
   const imageUrl = rawImageUrl || undefined;
 
+  // Auto-detect Cathedral from notes if not already in style
+  let style = row.style || "";
+  const notes = (row.notes || "").toLowerCase();
+  const name = (row.name || "").toLowerCase();
+  const styleLower = style.toLowerCase();
+  
+  // Check if "cathedral" appears in notes or name but not in style
+  if ((notes.includes("cathedral") || name.includes("cathedral")) && 
+      !styleLower.includes("cathedral")) {
+    // Add Cathedral as primary style
+    style = style ? `Cathedral, ${style}` : "Cathedral";
+  }
+
   return {
     id: `baserow-${row.id}`,
     name: row.name || "Unnamed Building",
@@ -87,7 +100,7 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     city: row.city,
     country: row.country,
     description: row.notes || "",
-    style: row.style as any, // Convert string to ArchitecturalStyle enum
+    style: style as any, // Convert string to ArchitecturalStyle enum
     coordinates: { lat, lng },
     gmapsUrl: row.Gmaps_url,
     googlePlaceId: row.google_place_id,

@@ -71,10 +71,11 @@ async function main() {
   const buildings = await fetchAllBuildings();
   console.log(`✅ Found ${buildings.length} total buildings\n`);
 
-  // Find cathedrals (case-insensitive check)
+  // Find cathedrals (case-insensitive check in name OR notes)
   const cathedrals = buildings.filter((building) => {
     const name = (building.name || '').toLowerCase();
-    return name.includes('cathedral');
+    const notes = (building.notes || '').toLowerCase();
+    return name.includes('cathedral') || notes.includes('cathedral');
   });
 
   console.log(`🏛️  Found ${cathedrals.length} cathedrals:\n`);
@@ -95,7 +96,11 @@ async function main() {
       const newStyle = cathedral.style 
         ? `Cathedral, ${cathedral.style}`
         : 'Cathedral';
+      const foundIn = (cathedral.name || '').toLowerCase().includes('cathedral') 
+        ? 'name' 
+        : 'notes';
       console.log(`  - "${cathedral.name}" (ID: ${cathedral.id})`);
+      console.log(`    Found "cathedral" in: ${foundIn}`);
       console.log(`    Current style: ${currentStyle}`);
       console.log(`    Will update to: ${newStyle}\n`);
     }

@@ -54,12 +54,31 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   // Shuffle messages when loading starts
   useEffect(() => {
     if (isLoading && searchStatus !== 'idle') {
-      // Shuffle array using Fisher-Yates algorithm
-      const shuffled = [...allLoadingMessages];
-      for (let i = shuffled.length - 1; i > 0; i--) {
+      // Keep the Nastya messages together as a pair
+      const nastyaPair = [
+        'Reminding Nastya the Nick is crazy about her',
+        'No really, Nick like "like" likes Nastya'
+      ];
+      
+      // Get all other messages (excluding the Nastya pair)
+      const otherMessages = allLoadingMessages.filter(
+        msg => !nastyaPair.includes(msg)
+      );
+      
+      // Shuffle other messages using Fisher-Yates algorithm
+      for (let i = otherMessages.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        [otherMessages[i], otherMessages[j]] = [otherMessages[j], otherMessages[i]];
       }
+      
+      // Insert the Nastya pair at a random position
+      const insertPosition = Math.floor(Math.random() * (otherMessages.length + 1));
+      const shuffled = [
+        ...otherMessages.slice(0, insertPosition),
+        ...nastyaPair,
+        ...otherMessages.slice(insertPosition)
+      ];
+      
       setShuffledMessages(shuffled);
       setLoadingMessageIndex(0);
     } else {
