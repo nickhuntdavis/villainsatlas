@@ -1,8 +1,13 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { Map as AtlasMap } from './components/Map';
-import { BuildingDetails } from './components/BuildingDetails';
 import { SearchPanel } from './components/SearchPanel';
-import { FallingHearts } from './components/FallingHearts';
+// Lazy load non-critical components for code splitting
+const BuildingDetails = lazy(() => 
+  import('./components/BuildingDetails').then(module => ({ default: module.BuildingDetails }))
+);
+const FallingHearts = lazy(() => 
+  import('./components/FallingHearts').then(module => ({ default: module.FallingHearts }))
+);
 import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings } from './services/baserowService';
@@ -266,23 +271,41 @@ function App() {
     }
   }, [loading, searchStatus, statusMessage]);
 
+  // Register service worker for Baserow API caching (production only)
+  useEffect(() => {
+    if ('serviceWorker' in navigator && (import.meta as any).env?.PROD) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered:', registration);
+        })
+        .catch((error) => {
+          console.warn('Service Worker registration failed:', error);
+        });
+    }
+  }, []);
+
   // Initial load of all Baserow buildings for caching and display on map
   useEffect(() => {
     const loadInitialBaserow = async () => {
       try {
-        const all = await fetchAllBuildings();
+        // Phase 1: Load only first page (200 buildings) for immediate render
+        // This prevents blocking initial render with multiple API calls
+        const initialBuildings = await fetchAllBuildings(1); // Limit to first page only
         // Filter out buildings with invalid coordinates
-        const validBuildings = all.filter((b) => 
+        const validInitialBuildings = initialBuildings.filter((b) => 
           b.coordinates && 
           !isNaN(b.coordinates.lat) && 
           !isNaN(b.coordinates.lng) &&
           !(b.coordinates.lat === 0 && b.coordinates.lng === 0)
         );
-        setAllBaserowBuildings(validBuildings);
+        
+        // Set initial buildings immediately for fast first render
+        setAllBaserowBuildings(validInitialBuildings);
         
         // Display buildings within initial map view (50km radius from default center)
         const initialRadius = 50000; // 50km
-        let buildingsInView = validBuildings.filter((b) => {
+        let buildingsInView = validInitialBuildings.filter((b) => {
           // Filter by distance
           const withinRadius = getDistance(DEFAULT_COORDINATES, b.coordinates) <= initialRadius;
           if (!withinRadius) return false;
@@ -295,6 +318,51 @@ function App() {
           }
           return true;
         });
+        
+        // Phase 2: Load remaining pages in background after initial render
+        // Use requestIdleCallback or setTimeout to defer non-critical loading
+        const loadRemainingBuildings = async () => {
+          try {
+            const allBuildings = await fetchAllBuildings(); // Fetch all pages
+            const validAllBuildings = allBuildings.filter((b) => 
+              b.coordinates && 
+              !isNaN(b.coordinates.lat) && 
+              !isNaN(b.coordinates.lng) &&
+              !(b.coordinates.lat === 0 && b.coordinates.lng === 0)
+            );
+            // Update with complete dataset
+            setAllBaserowBuildings(validAllBuildings);
+            
+            // Update buildings in view if any new ones are in viewport
+            const updatedBuildingsInView = validAllBuildings.filter((b) => {
+              const withinRadius = getDistance(DEFAULT_COORDINATES, b.coordinates) <= initialRadius;
+              if (!withinRadius) return false;
+              
+              const rowIdMatch = b.id.match(/^baserow-(\d+)$/);
+              if (rowIdMatch) {
+                const rowId = parseInt(rowIdMatch[1], 10);
+                return !blacklistedBuildingIds.has(rowId);
+              }
+              return true;
+            });
+            
+            // Only update if we found new buildings in view
+            if (updatedBuildingsInView.length > buildingsInView.length) {
+              setBuildings(updatedBuildingsInView);
+            }
+          } catch (err) {
+            console.error("Error loading remaining Baserow buildings:", err);
+          }
+        };
+        
+        // Defer remaining building loads using requestIdleCallback or setTimeout
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => {
+            setTimeout(loadRemainingBuildings, 100); // Small delay to ensure initial render completes
+          }, { timeout: 2000 });
+        } else {
+          setTimeout(loadRemainingBuildings, 500); // Fallback for browsers without requestIdleCallback
+        }
         
         // Enrich buildings with images if they have google_place_id but no imageUrl
         // Do this in batches to avoid overwhelming the API (limit to first 20)
@@ -1262,12 +1330,16 @@ function App() {
       </main>
 
       {/* Detail Panel - Sliding Drawer */}
-      <BuildingDetails 
-        building={selectedBuilding} 
-        onClose={handleCloseDetails} 
-        theme={theme}
-        userLocation={userLocation}
-      />
+      {selectedBuilding && (
+        <Suspense fallback={null}>
+          <BuildingDetails 
+            building={selectedBuilding} 
+            onClose={handleCloseDetails} 
+            theme={theme}
+            userLocation={userLocation}
+          />
+        </Suspense>
+      )}
 
       {/* The "N" Button - Bottom Left */}
       <button
@@ -1276,7 +1348,7 @@ function App() {
         title="The Architect"
         aria-label="The Architect"
       >
-        <Heart size={20} className="group-hover:scale-110 transition-all fill-current text-red-500" aria-hidden="true" />
+        <Heart size={20} className="group-hover:scale-110 transition-all fill-current" style={{ color: '#FF5D88' }} aria-hidden="true" />
       </button>
 
 
@@ -1398,7 +1470,9 @@ function App() {
 
       {/* Falling hearts animation */}
       {showFallingHearts && (
-        <FallingHearts onComplete={() => setShowFallingHearts(false)} />
+        <Suspense fallback={null}>
+          <FallingHearts onComplete={() => setShowFallingHearts(false)} />
+        </Suspense>
       )}
 
       {/* Branding overlay (bottom right) - Removed for clean aesthetic */}

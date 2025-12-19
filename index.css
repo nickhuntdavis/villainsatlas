@@ -1,0 +1,45 @@
+/* Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* Custom font family */
+@theme {
+  --font-family-neue-machina: 'Neue Machina', sans-serif;
+}
+
+/* Ensure buttons show pointer cursor */
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Override Leaflet's default grey tile backgrounds */
+.leaflet-container {
+  background-color: #020B21 !important;
+}
+
+.leaflet-tile-pane,
+.leaflet-tile-container,
+.leaflet-tile {
+  background-color: #020B21 !important;
+}
+
+.leaflet-tile-pane img,
+.leaflet-tile-container img,
+img.leaflet-tile {
+  background-color: #020B21 !important;
+}
+
+/* Target loading/empty tiles specifically */
+.leaflet-tile-container img[src=""],
+.leaflet-tile-container img:not([src]),
+img.leaflet-tile[src=""],
+img.leaflet-tile:not([src]),
+.leaflet-tile-loaded,
+.leaflet-tile-loading {
+  background-color: #020B21 !important;
+  background-image: none !important;
+}
+

@@ -13,37 +13,22 @@ interface BuildingMarkerProps {
 
 export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSelected, onSelect, onTripleClick }) => {
   const map = useMap();
-  const clickCountRef = useRef(0);
-  const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Check if this is Nick - show red heart icon
   const isNick = building.name === "Nick";
   
-  // Prioritized buildings (historically significant Art Deco) get red pins
+  // Check if this is Palace of Culture and Science
+  const isPalaceOfCulture = building.name === "Palace of Culture and Science";
+  
+  // Prioritized buildings get orange/coral pins
   const color = building.isPrioritized 
-    ? '#ef4444' // Red-500
+    ? '#FF8052' // Orange/coral from palette
     : (building.style ? (GENRE_COLORS[normalizeStyle(building.style)] || GENRE_COLORS['Other']) : GENRE_COLORS['Other']);
 
   const handleClick = () => {
-    // Only track triple-click for Nick pin
+    // Trigger hearts animation on single click for Nick pin
     if (isNick && onTripleClick) {
-      clickCountRef.current += 1;
-      
-      // Clear existing timer
-      if (clickTimerRef.current) {
-        clearTimeout(clickTimerRef.current);
-      }
-      
-      // If we've reached 3 clicks, trigger the callback
-      if (clickCountRef.current >= 3) {
-        onTripleClick();
-        clickCountRef.current = 0;
-      } else {
-        // Reset counter after 1 second if no more clicks
-        clickTimerRef.current = setTimeout(() => {
-          clickCountRef.current = 0;
-        }, 1000);
-      }
+      onTripleClick();
     }
     
     // Always do the normal click behavior
@@ -59,6 +44,8 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     color,
     isSelected,
     variant: isNick ? 'nick' : 'standard',
+    isPrioritized: building.isPrioritized && !isPalaceOfCulture,
+    isPalaceOfCulture: isPalaceOfCulture,
   });
 
   return (

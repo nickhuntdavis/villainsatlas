@@ -4,23 +4,83 @@ import { divIcon } from 'leaflet';
 export interface MarkerIconProps {
   color: string; // Hex color
   isSelected: boolean;
-  variant?: 'standard' | 'nick'; // 'nick' = red heart icon
+  variant?: 'standard' | 'nick'; // 'nick' = heart icon
+  isPrioritized?: boolean; // Prioritized buildings get glow and bounce
+  isPalaceOfCulture?: boolean; // Palace of Culture gets special treatment
 }
 
 /**
  * Creates a Leaflet divIcon for building markers
  * This is used by BuildingMarker component
  */
-export const createMarkerIcon = ({ color, isSelected, variant = 'standard' }: MarkerIconProps) => {
-  const size = isSelected ? 32 : 24;
+export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPrioritized = false, isPalaceOfCulture = false }: MarkerIconProps) => {
+  let size: number;
+  let animationClass = '';
+  let glowStyle = '';
+  let sparkleStyle = '';
+  
+  // Helper function to convert hex to rgba with opacity
+  const hexToRgba = (hex: string, opacity: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
+  
+  if (isPalaceOfCulture) {
+    // Extra large size for Palace of Culture - heart icon with subtle glow
+    size = isSelected ? 48 : 40;
+    animationClass = 'palace-pulse';
+    const palaceColor = '#FF5D88'; // Same color as Nick
+    const palaceGlowColor = hexToRgba(palaceColor, 0.2); // Very subtle glow
+    sparkleStyle = `
+      <style>
+        @keyframes palacePulse {
+          0%, 100% {
+            transform: scale(1);
+            filter: drop-shadow(0 0 2px ${palaceGlowColor}) drop-shadow(0 0 4px ${palaceGlowColor});
+          }
+          50% {
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 3px ${palaceGlowColor}) drop-shadow(0 0 6px ${palaceGlowColor});
+          }
+        }
+        .palace-pulse {
+          animation: palacePulse 3s ease-in-out infinite;
+        }
+      </style>
+    `;
+  } else if (isPrioritized) {
+    // Prioritized buildings get subtle glow only (no bounce)
+    size = isSelected ? 36 : 28;
+    animationClass = 'prioritized-glow';
+    const glowColor = hexToRgba(color, 0.3);
+    glowStyle = `
+      <style>
+        @keyframes prioritizedGlow {
+          0%, 100% {
+            filter: drop-shadow(0 0 3px ${glowColor}) drop-shadow(0 0 6px ${glowColor});
+          }
+          50% {
+            filter: drop-shadow(0 0 4px ${glowColor}) drop-shadow(0 0 8px ${glowColor});
+          }
+        }
+        .prioritized-glow {
+          animation: prioritizedGlow 2s ease-in-out infinite;
+        }
+      </style>
+    `;
+  } else {
+    size = isSelected ? 32 : 24;
+  }
   
   let html: string;
   
-  if (variant === 'nick') {
-    // Red heart icon for Nick
-    const heartColor = '#ef4444'; // Red-500
+  if (variant === 'nick' || isPalaceOfCulture) {
+    // Heart icon for Nick and Palace of Culture - both use same color
+    const heartColor = '#FF5D88';
     html = `
-      <div style="
+      <div class="${animationClass}" style="
         width: ${size}px;
         height: ${size}px;
         display: flex;
@@ -32,19 +92,25 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard' }: Ma
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
       </div>
+      ${sparkleStyle || ''}
     `;
   } else {
     // Standard sharp, angular pin shape (flipped upside down)
     html = `
-      <div style="
+      ${glowStyle}
+      <div class="${animationClass}" style="
         width: ${size}px;
         height: ${size}px;
         background-color: ${color};
         transform: rotate(225deg);
         border-radius: 0 50% 50% 50%;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.8);
-        border: 2px solid #09090b; 
-      " class="flex items-center justify-center relative group">
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        border: 2px solid #09090b;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
         <div style="
           width: 30%;
           height: 30%;

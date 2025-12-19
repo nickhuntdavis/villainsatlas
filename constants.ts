@@ -59,40 +59,40 @@ export const normalizeStyle = (style: string | undefined): string => {
 };
 
 export const GENRE_COLORS: Record<string, string> = {
-  // Soviet/Communist - Red tones
-  'Stalinist Gothic': '#f872a8', // Updated accent color
-  'Soviet Modernism': '#dc2626', // Red-600
-  'Socialist Classicism': '#b91c1c', // Red-700
-  'Soviet Brutalism': '#991b1b', // Red-800
+  // Soviet/Communist - Lime green
+  'Stalinist Gothic': '#C1EF7B',
+  'Soviet Modernism': '#C1EF7B',
+  'Socialist Classicism': '#C1EF7B',
+  'Soviet Brutalism': '#C1EF7B',
   
-  // Brutalist - Gray tones
-  'Brutalism': '#a1a1aa', // Zinc-400
-  'New Brutalism': '#71717a', // Zinc-500
-  'Concrete Brutalism': '#52525b', // Zinc-600
-  'Brutalist': '#a1a1aa', // Alias
+  // Brutalist - Orange/coral
+  'Brutalism': '#FF8052',
+  'New Brutalism': '#FF8052',
+  'Concrete Brutalism': '#FF8052',
+  'Brutalist': '#FF8052', // Alias
   
-  // Deco - Silver/Gray tones
-  'Dark Deco': '#d4d4d8', // Zinc-300
-  'Art Deco': '#e4e4e7', // Zinc-200
-  'Streamlined Moderne': '#f4f4f5', // Zinc-100
-  'Gothic Deco': '#a1a1aa', // Zinc-400
+  // Deco - Purple
+  'Dark Deco': '#9873D3',
+  'Art Deco': '#9873D3',
+  'Streamlined Moderne': '#9873D3',
+  'Gothic Deco': '#9873D3',
   
-  // Gothic - Dark red/brown tones
-  'Gothic Revival': '#7c2d12', // Red-900
-  'Neo-Gothic': '#991b1b', // Red-800
-  'Gothic': '#7c2d12', // Red-900
-  'Victorian Gothic': '#9a3412', // Red-800
-  'Industrial Gothic': '#6b1f1f', // Dark red
+  // Gothic - Light grey/pink
+  'Gothic Revival': '#DFD3D6',
+  'Neo-Gothic': '#DFD3D6',
+  'Gothic': '#DFD3D6',
+  'Victorian Gothic': '#DFD3D6',
+  'Industrial Gothic': '#DFD3D6',
   
-  // Other menacing - Various dark tones
-  'Totalitarian': '#7f1d1d', // Red-950
-  'Fascist Architecture': '#450a0a', // Very dark red
-  'Monumental': '#3f3f46', // Zinc-700
-  'Fortress': '#27272a', // Zinc-800
-  'Bunker': '#18181b', // Zinc-900
-  'Cyberpunk': '#10b981', // Emerald-500 (futuristic)
-  'Dystopian': '#059669', // Emerald-600
+  // Other menacing - Light grey/pink
+  'Totalitarian': '#DFD3D6',
+  'Fascist Architecture': '#DFD3D6',
+  'Monumental': '#DFD3D6',
+  'Fortress': '#DFD3D6',
+  'Bunker': '#DFD3D6',
+  'Cyberpunk': '#DFD3D6',
+  'Dystopian': '#DFD3D6',
   
   // Fallback
-  'Other': '#71717a', // Zinc-500
+  'Other': '#DFD3D6',
 };

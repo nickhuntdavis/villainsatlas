@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Coordinates, Building } from '../types';
 import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM } from '../constants';
 import { BuildingMarker } from './BuildingMarker';
@@ -88,6 +89,63 @@ const MapBoundsTracker: React.FC<MapBoundsTrackerProps> = ({ onBoundsRequest }) 
   return null;
 };
 
+// Component to optimize LCP by adding fetchpriority to first map tile and improve tile loading
+const LCPOptimizer: React.FC = () => {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Find the first map tile image and add fetchpriority="high"
+    const optimizeLCP = () => {
+      const tileContainer = map.getContainer();
+      if (tileContainer) {
+        const tiles = tileContainer.querySelectorAll('img.leaflet-tile') as NodeListOf<HTMLImageElement>;
+        // Set fetchpriority="high" on first few visible tiles for LCP
+        tiles.forEach((tile, index) => {
+          if (index < 4 && !tile.hasAttribute('fetchpriority')) {
+            tile.setAttribute('fetchpriority', 'high');
+          }
+          // Ensure tiles load properly
+          if (!tile.complete && tile.src) {
+            tile.loading = 'eager' as any;
+          }
+          // Set background color for unloaded tiles
+          if (!tile.complete || !tile.src) {
+            tile.style.backgroundColor = '#020B21';
+          }
+        });
+        
+        // Also set background on tile containers
+        const tileContainers = tileContainer.querySelectorAll('.leaflet-tile-container');
+        tileContainers.forEach((container) => {
+          (container as HTMLElement).style.backgroundColor = '#020B21';
+        });
+      }
+    };
+    
+    // Try multiple times to catch tiles as they load
+    optimizeLCP();
+    const timeout1 = setTimeout(optimizeLCP, 50);
+    const timeout2 = setTimeout(optimizeLCP, 200);
+    const timeout3 = setTimeout(optimizeLCP, 500);
+    
+    // Also listen for tile load events
+    const handleTileLoad = () => optimizeLCP();
+    const handleTileError = () => optimizeLCP();
+    map.on('tileload', handleTileLoad);
+    map.on('tileerror', handleTileError);
+    
+    return () => {
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      clearTimeout(timeout3);
+      map.off('tileload', handleTileLoad);
+      map.off('tileerror', handleTileError);
+    };
+  }, [map]);
+  
+  return null;
+};
+
 interface MapProps {
   center: Coordinates;
   buildings: Building[];
@@ -109,16 +167,30 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
       scrollWheelZoom={true}
       zoomControl={false} // We'll add it manually to style or position it if needed
       className={`w-full h-full z-0 ${colors.background.surface}`}
+      preferCanvas={false}
+      fadeAnimation={true}
+      zoomAnimation={true}
+      markerZoomAnimation={true}
     >
       <TileLayer
         attribution={MAP_ATTRIBUTION}
         url={isDark ? MAP_TILE_URL_DARK : MAP_TILE_URL_LIGHT}
+        maxZoom={19}
+        minZoom={0}
+        maxNativeZoom={18}
+        tileSize={256}
+        zoomOffset={0}
+        keepBuffer={2}
+        updateWhenZooming={true}
+        updateWhenIdle={true}
+        noWrap={false}
       />
       <ZoomControl position="topright" />
       
       <MapSizeFixer />
       <MapUpdater center={center} />
       <MapBoundsTracker onBoundsRequest={onBoundsRequest} />
+      <LCPOptimizer />
 
       {buildings.map((b) => (
         <BuildingMarker

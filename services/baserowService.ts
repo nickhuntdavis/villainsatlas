@@ -100,7 +100,8 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
 };
 
 // Fetch all buildings from Baserow (with pagination)
-export const fetchAllBuildings = async (): Promise<Building[]> => {
+// Optionally limit to first N pages for progressive loading
+export const fetchAllBuildings = async (limitPages?: number): Promise<Building[]> => {
   try {
     const allRows: any[] = [];
     let page = 1;
@@ -123,6 +124,11 @@ export const fetchAllBuildings = async (): Promise<Building[]> => {
 
       const data = await response.json();
       allRows.push(...data.results);
+
+      // If limitPages is set and we've reached it, stop fetching
+      if (limitPages && page >= limitPages) {
+        break;
+      }
 
       if (!data.next) break; // no more pages
       page += 1;

@@ -96,7 +96,7 @@ export const FallingHearts: React.FC<FallingHeartsProps> = ({ onComplete }) => {
       styleElement.textContent = `
         @keyframes fall-${index} {
           0% {
-            transform: translateY(-56px) rotate(${initialRotation}deg);
+            transform: translateY(-100px) rotate(${initialRotation}deg);
             opacity: 1;
           }
           60% {
@@ -138,8 +138,9 @@ export const FallingHearts: React.FC<FallingHeartsProps> = ({ onComplete }) => {
         >
           <Heart
             size={heart.size}
-            className="text-red-500 fill-red-500"
+            className="fill-current"
             style={{
+              color: '#FF5D88',
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
             }}
           />

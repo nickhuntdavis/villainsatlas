@@ -4,10 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Villain's Atlas</title>
+    <!-- Resource hints for external APIs -->
+    <link rel="preconnect" href="https://api.baserow.io">
+    <link rel="dns-prefetch" href="https://api.baserow.io">
+    <!-- Resource hints for map tile servers -->
+    <link rel="dns-prefetch" href="https://basemaps.cartocdn.com">
+    <link rel="dns-prefetch" href="https://tile.openstreetmap.org">
+    <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin>
+    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
     <!-- Fonts: Neue Machina for headings, Inter for body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
     <!-- Neue Machina - Self-hosted font files -->
     <link rel="preload" href="/fonts/NeueMachina-Regular.otf" as="font" type="font/otf" crossorigin>
     <link rel="preload" href="/fonts/NeueMachina-Ultrabold.otf" as="font" type="font/otf" crossorigin>
@@ -48,19 +57,6 @@
         font-display: swap;
       }
     </style>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              'neue-machina': ['Neue Machina', 'sans-serif'],
-            }
-          }
-        }
-      }
-    </script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <style>
       /* Custom scrollbar - minimal clean style */
       ::-webkit-scrollbar {
@@ -87,7 +83,40 @@
         }
       }
       .leaflet-container {
-        background: #0a0a0a;
+        background: #020B21 !important;
+      }
+      /* Ensure Leaflet tiles load properly */
+      .leaflet-tile-container img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+      }
+      .leaflet-tile-pane {
+        z-index: 2;
+        background-color: #020B21 !important;
+      }
+      /* Set unloaded tile areas to custom color instead of grey */
+      .leaflet-tile-container {
+        background-color: #020B21 !important;
+      }
+      .leaflet-tile {
+        background-color: #020B21 !important;
+      }
+      /* Target the actual tile image placeholders */
+      .leaflet-tile-pane img {
+        background-color: #020B21 !important;
+      }
+      /* Target empty/loading tiles */
+      .leaflet-tile-container img[src=""],
+      .leaflet-tile-container img:not([src]),
+      img.leaflet-tile[src=""],
+      img.leaflet-tile:not([src]) {
+        background-color: #020B21 !important;
+        background-image: none !important;
+      }
+      /* Override any grey backgrounds Leaflet might set */
+      .leaflet-tile-loaded,
+      .leaflet-tile-loading {
+        background-color: #020B21 !important;
       }
       /* Apply Inter as default body font */
       body {
@@ -117,20 +146,6 @@
         border-width: 0;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "leaflet": "https://esm.sh/leaflet@^1.9.4",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react-leaflet": "https://esm.sh/react-leaflet@^5.0.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-black text-[#fafafa] antialiased overflow-hidden">
     <div id="root"></div>

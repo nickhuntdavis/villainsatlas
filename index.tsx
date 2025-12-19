@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { StyleGuide } from './ui/StyleGuide';
+import './index.css';
+
+// Lazy load StyleGuide since it's only used on /style-guide route
+const StyleGuide = lazy(() => 
+  import('./ui/StyleGuide').then(module => ({ default: module.StyleGuide }))
+);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -17,6 +22,12 @@ const path = window.location.pathname;
 
 root.render(
   <React.StrictMode>
-    {path === '/style-guide' ? <StyleGuide /> : <App />}
+    {path === '/style-guide' ? (
+      <Suspense fallback={<div>Loading style guide...</div>}>
+        <StyleGuide />
+      </Suspense>
+    ) : (
+      <App />
+    )}
   </React.StrictMode>
 );
