@@ -11,9 +11,12 @@ const FallingHearts = lazy(() =>
 const POIConfirmationModal = lazy(() => 
   import('./components/POIConfirmationModal').then(module => ({ default: module.POIConfirmationModal }))
 );
+const DeleteBuildingModal = lazy(() => 
+  import('./components/DeleteBuildingModal').then(module => ({ default: module.DeleteBuildingModal }))
+);
 import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding, isPOIQuery, searchPOIByName, checkPOIStyleCriteria } from './services/geminiService';
-import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow } from './services/baserowService';
+import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow, hideBuildingInBaserow } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan, X } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
@@ -40,6 +43,7 @@ function App() {
   const [showFallingHearts, setShowFallingHearts] = useState(false);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
   const [poiConfirmationBuilding, setPOIConfirmationBuilding] = useState<Building | null>(null);
+  const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null);
   const [blacklistedBuildingIds, setBlacklistedBuildingIds] = useState<Set<number>>(() => {
     // Load blacklisted IDs from localStorage
     if (typeof window !== 'undefined') {
@@ -773,11 +777,11 @@ function App() {
           // Matches criteria - add it automatically
           const enrichedBuilding = styleCheck.building;
           
-          // Check if it already exists in Baserow
-          const existing = await fetchBuildingByName(enrichedBuilding.name);
-          if (existing && existing.length > 0) {
-            // Already exists - just show it
-            setBuildings((prev) => mergeBuildings(prev, existing));
+                // Check if it already exists in Baserow
+                const existing = await fetchBuildingByName(enrichedBuilding.name);
+                if (existing) {
+                  // Already exists - just show it
+                  setBuildings((prev) => mergeBuildings(prev, [existing]));
             setCenter(enrichedBuilding.coordinates);
             setLoading(false);
             setStatusMessage(`Found "${enrichedBuilding.name}" in database`);
@@ -1515,6 +1519,11 @@ function App() {
             onClose={handleCloseDetails} 
             theme={theme}
             userLocation={userLocation}
+            onDelete={() => {
+              if (selectedBuilding) {
+                setBuildingToDelete(selectedBuilding);
+              }
+            }}
           />
         </Suspense>
       )}
@@ -1682,8 +1691,8 @@ function App() {
               try {
                 // Check if it already exists
                 const existing = await fetchBuildingByName(building.name);
-                if (existing && existing.length > 0) {
-                  setBuildings((prev) => mergeBuildings(prev, existing));
+                if (existing) {
+                  setBuildings((prev) => mergeBuildings(prev, [existing]));
                   setCenter(building.coordinates);
                   setLoading(false);
                   setStatusMessage(`Found "${building.name}" in database`);
@@ -1707,6 +1716,51 @@ function App() {
             }}
             onCancel={() => {
               setPOIConfirmationBuilding(null);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* Delete Building Modal */}
+      {buildingToDelete && (
+        <Suspense fallback={null}>
+          <DeleteBuildingModal
+            building={buildingToDelete}
+            theme={theme}
+            onConfirm={async () => {
+              const building = buildingToDelete;
+              setBuildingToDelete(null);
+              
+              // Extract Baserow row ID from building.id (format: "baserow-{id}")
+              const rowIdMatch = building.id.match(/^baserow-(\d+)$/);
+              if (!rowIdMatch) {
+                console.error(`Cannot delete building "${building.name}": Invalid ID format`);
+                setError(`Cannot delete building: Invalid ID format`);
+                return;
+              }
+              
+              const rowId = parseInt(rowIdMatch[1], 10);
+              
+              try {
+                // Hide building in Baserow
+                await hideBuildingInBaserow(rowId);
+                console.log(`✅ Hidden building "${building.name}" in Baserow`);
+                
+                // Remove building from local state
+                setBuildings((prev) => prev.filter(b => b.id !== building.id));
+                
+                // Close the building details panel
+                setSelectedBuilding(null);
+                
+                // Show success message
+                setStatusMessage(`Removed "${building.name}" from the map`);
+              } catch (err) {
+                console.error(`Failed to hide building "${building.name}":`, err);
+                setError(`Failed to remove "${building.name}"`);
+              }
+            }}
+            onCancel={() => {
+              setBuildingToDelete(null);
             }}
           />
         </Suspense>

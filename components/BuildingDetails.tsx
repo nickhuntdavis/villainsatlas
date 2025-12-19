@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building, Coordinates } from '../types';
-import { X, MapPin, Navigation, ImageOff, User, MessageCircle } from 'lucide-react';
+import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 
@@ -9,6 +9,7 @@ interface BuildingDetailsProps {
   onClose: () => void;
   theme: 'dark' | 'light';
   userLocation?: Coordinates | null;
+  onDelete?: () => void;
 }
 
 // Helper function to extract URL from markdown link format [text](url) or just return URL if already plain
@@ -50,7 +51,7 @@ const formatDistance = (meters: number): string => {
   return `${(meters / 1000).toFixed(1)}km`;
 };
 
-export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation }) => {
+export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete }) => {
   const [imgError, setImgError] = useState(false);
 
   // Reset error state when building changes
@@ -229,9 +230,22 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
         {/* Estimated Distance */}
         {userLocation && building && (
           <div className="mt-8 pt-6 border-t border-white/20">
-            <div className={`${typography.body.sm} text-white`}>
-              <span className="opacity-70">Estimated distance: </span>
-              <span className="font-medium">{formatDistance(getDistance(userLocation, building.coordinates))}</span>
+            <div className={`${typography.body.sm} text-white flex items-center justify-between`}>
+              <div>
+                <span className="opacity-70">Estimated distance: </span>
+                <span className="font-medium">{formatDistance(getDistance(userLocation, building.coordinates))}</span>
+              </div>
+              {onDelete && (
+                <button
+                  onClick={onDelete}
+                  className="p-1.5 hover:opacity-80 transition-opacity"
+                  title="Remove this building"
+                  aria-label="Remove this building"
+                  style={{ color: '#11162F' }}
+                >
+                  <ThumbsDown size={16} strokeWidth={2} aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
         )}

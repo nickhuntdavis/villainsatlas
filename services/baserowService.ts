@@ -36,6 +36,7 @@ interface BaserowRow {
   architect?: string; // Architect name if available
   location?: string; // Full address/location
   is_prioritized?: boolean; // Whether building is prioritized (Art Deco by famous architect)
+  is_hidden?: boolean; // Whether building is hidden (soft-deleted)
 }
 
 // Extended Building interface for saving (includes Baserow-specific fields)
@@ -145,7 +146,9 @@ export const fetchAllBuildings = async (limitPages?: number): Promise<Building[]
       page += 1;
     }
 
-    return allRows.map(baserowRowToBuilding);
+    // Filter out hidden buildings
+    const visibleRows = allRows.filter((row: any) => !row.is_hidden);
+    return visibleRows.map(baserowRowToBuilding);
   } catch (error) {
     console.error("Error fetching from Baserow:", error);
     throw error;
@@ -191,7 +194,11 @@ export const fetchBuildingByName = async (name: string): Promise<Building | null
 
     const data = await response.json();
     if (data.results && data.results.length > 0) {
-      return baserowRowToBuilding(data.results[0]);
+      // Filter out hidden buildings
+      const visibleResults = data.results.filter((row: any) => !row.is_hidden);
+      if (visibleResults.length > 0) {
+        return baserowRowToBuilding(visibleResults[0]);
+      }
     }
     return null;
   } catch (error) {
@@ -350,6 +357,31 @@ export const findExistingBuilding = async (building: Building): Promise<{ exists
   } catch (error) {
     console.error("Error checking if building exists:", error);
     return { exists: false };
+  }
+};
+
+// Hide (soft-delete) a building in Baserow
+export const hideBuildingInBaserow = async (rowId: number): Promise<void> => {
+  try {
+    const response = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ is_hidden: true }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Baserow API error: ${response.status} - ${errorText}`);
+    }
+  } catch (error) {
+    console.error("Error hiding building in Baserow:", error);
+    throw error;
   }
 };
 

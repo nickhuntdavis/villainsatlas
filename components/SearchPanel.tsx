@@ -34,21 +34,21 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   
   // All loading messages
   const allLoadingMessages = [
-    'Evaluating Beauty Thresholds',
-    'Rasterising City Skeletons',
-    'Calibrating Monumental Mass',
-    'Scanning for Structural Arrogance',
-    'Resolving Decorative Excess',
-    'Detecting Overengineered Confidence',
-    'Sorting Slavic Sensibilities',
-    'Cross-Referencing Vibes',
+    'Evaluating Beauty Thresholds...',
+    'Rasterising City Skeletons...',
+    'Calibrating Monumental Mass...',
+    'Scanning for Structural Arrogance...',
+    'Resolving Decorative Excess...',
+    'Detecting Overengineered Confidence...',
+    'Sorting Slavic Sensibilities...',
+    'Cross-Referencing Vibes...',
     'Reminding Nastya the Nick is crazy about her',
-    'No really, Nick like "like" likes Nastya',
-    'Consulting the Lore',
-    'Reticulating Splines',
-    'Inverting Aesthetic Expectations',
-    'Searching building archives',
-    'Scraping Dark Web'
+    'No really, Nick like "like" likes Nastya...',
+    'Consulting the Lore...',
+    'Reticulating Splines...',
+    'Inverting Aesthetic Expectations...',
+    'Searching building archives...',
+    'Scraping Dark Web...'
   ];
   
   // Shuffle messages when loading starts
