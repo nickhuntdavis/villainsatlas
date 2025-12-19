@@ -4,7 +4,7 @@ import { divIcon } from 'leaflet';
 export interface MarkerIconProps {
   color: string; // Hex color
   isSelected: boolean;
-  variant?: 'standard' | 'nick'; // 'nick' = heart icon
+  variant?: 'standard' | 'nick' | 'purpleHeart'; // 'nick' = red heart icon, 'purpleHeart' = purple heart icon
   isPrioritized?: boolean; // Prioritized buildings get glow and bounce
   isPalaceOfCulture?: boolean; // Palace of Culture gets special treatment
 }
@@ -13,7 +13,7 @@ export interface MarkerIconProps {
  * Creates a Leaflet divIcon for building markers
  * This is used by BuildingMarker component
  */
-export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPrioritized = false, isPalaceOfCulture = false }: MarkerIconProps) => {
+export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPrioritized = false, isPalaceOfCulture = false, hasPurpleHeart = false }: MarkerIconProps & { hasPurpleHeart?: boolean }) => {
   let size: number;
   let animationClass = '';
   let glowStyle = '';
@@ -71,6 +71,27 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
         }
       </style>
     `;
+  } else if (variant === 'purpleHeart' || hasPurpleHeart) {
+    // Purple heart icon with purple glow (similar to isPrioritized but with heart icon)
+    size = isSelected ? 42 : 32;
+    animationClass = 'purple-heart-glow';
+    const purpleColor = '#9873D3'; // Dark Deco purple
+    const purpleGlowColor = hexToRgba(purpleColor, 0.4);
+    glowStyle = `
+      <style>
+        @keyframes purpleHeartGlow {
+          0%, 100% {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 4px ${purpleGlowColor}) drop-shadow(0 0 8px ${purpleGlowColor});
+          }
+          50% {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 6px ${purpleGlowColor}) drop-shadow(0 0 12px ${purpleGlowColor});
+          }
+        }
+        .purple-heart-glow {
+          animation: purpleHeartGlow 2s ease-in-out infinite;
+        }
+      </style>
+    `;
   } else if (isPrioritized) {
     // Prioritized buildings get subtle glow and are bigger (no bounce)
     // 150% bigger: 28px -> 42px, 36px -> 54px
@@ -104,6 +125,24 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     const heartColor = '#FF5D88';
     html = `
       ${glowStyle || sparkleStyle || ''}
+      <div class="${animationClass}" style="
+        width: ${size}px;
+        height: ${size}px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+      ">
+        <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${heartColor}" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </div>
+    `;
+  } else if (variant === 'purpleHeart' || hasPurpleHeart) {
+    // Purple heart icon with purple glow
+    const heartColor = '#9873D3'; // Dark Deco purple
+    html = `
+      ${glowStyle}
       <div class="${animationClass}" style="
         width: ${size}px;
         height: ${size}px;

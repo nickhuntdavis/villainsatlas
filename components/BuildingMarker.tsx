@@ -41,9 +41,10 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   const icon = createMarkerIcon({
     color,
     isSelected,
-    variant: isNick ? 'nick' : 'standard',
-    isPrioritized: building.isPrioritized && !isPalaceOfCulture,
+    variant: isNick ? 'nick' : building.hasPurpleHeart ? 'purpleHeart' : 'standard',
+    isPrioritized: building.isPrioritized && !isPalaceOfCulture && !building.hasPurpleHeart,
     isPalaceOfCulture: isPalaceOfCulture,
+    hasPurpleHeart: building.hasPurpleHeart || false,
   });
 
   return (

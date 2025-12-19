@@ -37,6 +37,7 @@ interface BaserowRow {
   location?: string; // Full address/location
   is_prioritized?: boolean; // Whether building is prioritized (Art Deco by famous architect)
   is_hidden?: boolean; // Whether building is hidden (soft-deleted)
+  is_purple_heart?: boolean; // Whether building should have a purple glowing heart
 }
 
 // Extended Building interface for saving (includes Baserow-specific fields)
@@ -75,6 +76,16 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
   // This ensures only buildings explicitly marked as prioritized get the special styling
   const isPrioritized = row.is_prioritized === true;
 
+  // Check for purple heart buildings - either from Baserow field or by name
+  const purpleHeartBuildings = [
+    'Our First Date',
+    'Our Kissing Station',
+    'Not Tram 13',
+    'Our first weekend away'
+  ];
+  const hasPurpleHeart = row.is_purple_heart === true || 
+    purpleHeartBuildings.some(purpleName => row.name === purpleName);
+
   // Extract image URL from markdown format if present
   const rawImageUrl = extractUrlFromMarkdown(row.image_url);
   // Allow all image URLs for display (previously only allowed Google Places)
@@ -108,6 +119,7 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     imageUrl: imageUrl,
     isPrioritized: !!isPrioritized,
     architect: row.architect || undefined,
+    hasPurpleHeart: !!hasPurpleHeart,
   };
 };
 
@@ -255,6 +267,7 @@ export const saveBuildingToBaserow = async (building: Building): Promise<Buildin
       style: building.style || "",
       architect: building.architect || "",
       is_prioritized: building.isPrioritized || false,
+      is_purple_heart: building.hasPurpleHeart || false,
     };
 
     // Log what we're saving for debugging
@@ -421,6 +434,7 @@ export const updateBuildingInBaserow = async (rowId: number, building: Building)
       style: building.style || "",
       architect: building.architect || "",
       is_prioritized: building.isPrioritized || false,
+      is_purple_heart: building.hasPurpleHeart || false,
     };
 
     // Only update image_url when we explicitly have one; otherwise preserve existing Baserow value

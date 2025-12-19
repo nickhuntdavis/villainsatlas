@@ -58,6 +58,7 @@ export interface Building {
   googlePlaceId?: string; // Google Place ID - use this to construct proper place URLs
   isPrioritized?: boolean; // True for historically significant Art Deco buildings by famous architects
   architect?: string; // Name of architect if well-known
+  hasPurpleHeart?: boolean; // True for special romantic locations that get purple glowing hearts
 }
 
 export interface MapViewState {
