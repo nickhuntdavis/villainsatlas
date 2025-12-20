@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImageGalleryProps {
@@ -9,9 +9,10 @@ interface ImageGalleryProps {
 export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [containerHeight, setContainerHeight] = useState<number>(400); // Default height
+  const [containerHeight, setContainerHeight] = useState<number | null>(null); // Dynamic height based on current image
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-play functionality (4 second intervals)
   useEffect(() => {
@@ -79,24 +80,64 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
     setTimeout(() => setIsPaused(false), 10000);
   };
 
-  // Update container height when images load to accommodate tallest image
-  const handleImageLoad = (index: number, img: HTMLImageElement) => {
-    // Calculate the rendered height (respecting max-width constraints)
-    const maxWidth = img.parentElement?.clientWidth || 800;
+  // Update container height based on current image's aspect ratio
+  const updateContainerHeight = useCallback((index: number) => {
+    const img = imageRefs.current[index];
+    if (!img || !containerRef.current) {
+      // If image not loaded yet, use default height
+      if (!containerHeight) {
+        setContainerHeight(400);
+      }
+      return;
+    }
+    
+    // Wait for image to be loaded
+    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+      return;
+    }
+    
+    const containerWidth = containerRef.current.clientWidth || 800;
     const naturalWidth = img.naturalWidth;
     const naturalHeight = img.naturalHeight;
     
-    // Calculate height if image is constrained by width
-    let renderedHeight = naturalHeight;
-    if (naturalWidth > maxWidth) {
-      renderedHeight = (naturalHeight / naturalWidth) * maxWidth;
+    // Calculate rendered height based on image aspect ratio and container width
+    let renderedHeight: number;
+    if (naturalWidth > containerWidth) {
+      // Image is wider than container - scale down proportionally
+      renderedHeight = (naturalHeight / naturalWidth) * containerWidth;
+    } else {
+      // Image fits within container width - use natural height
+      renderedHeight = naturalHeight;
     }
     
-    // Cap at 512px max
-    renderedHeight = Math.min(renderedHeight, 512);
+    // Apply constraints: min 200px, max 512px
+    renderedHeight = Math.max(200, Math.min(renderedHeight, 512));
     
-    setContainerHeight((prev) => Math.max(prev, renderedHeight, 300));
-  };
+    setContainerHeight(renderedHeight);
+  }, [containerHeight]);
+
+  // Update height when current image changes
+  useEffect(() => {
+    updateContainerHeight(currentIndex);
+  }, [currentIndex, updateContainerHeight]);
+
+  // Handle image load - update height if it's the current image
+  const handleImageLoad = useCallback((index: number, img: HTMLImageElement) => {
+    if (index === currentIndex) {
+      // Small delay to ensure image is fully rendered
+      setTimeout(() => updateContainerHeight(index), 50);
+    }
+  }, [currentIndex, updateContainerHeight]);
+
+  // Handle window resize to recalculate height
+  useEffect(() => {
+    const handleResize = () => {
+      updateContainerHeight(currentIndex);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [currentIndex, updateContainerHeight]);
 
   if (images.length === 0) return null;
 
@@ -106,12 +147,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Images container - fixed height based on tallest image to prevent layout shifts */}
+      {/* Images container - dynamic height based on current image aspect ratio */}
       <div 
-        className="relative w-full flex items-center justify-center"
+        ref={containerRef}
+        className="relative w-full flex items-center justify-center transition-all duration-500"
         style={{ 
-          height: `${containerHeight}px`,
-          minHeight: '300px',
+          height: containerHeight ? `${containerHeight}px` : '400px',
+          minHeight: '200px',
           maxHeight: '512px'
         }}
       >
