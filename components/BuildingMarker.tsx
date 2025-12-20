@@ -9,9 +9,11 @@ interface BuildingMarkerProps {
   isSelected: boolean;
   onSelect: (building: Building) => void;
   onTripleClick?: () => void; // Callback for triple-click on Nick pin
+  adminModeEnabled?: boolean; // When true, clicking opens edit modal instead of building details
+  onEdit?: (building: Building) => void; // Callback for edit mode
 }
 
-export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSelected, onSelect, onTripleClick }) => {
+export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSelected, onSelect, onTripleClick, adminModeEnabled = false, onEdit }) => {
   const map = useMap();
   
   // Check if this is Nick - show red heart icon
@@ -24,6 +26,16 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   const color = getPrimaryStyleColor(building.style);
 
   const handleClick = () => {
+    // If admin mode is enabled, open edit modal instead of building details
+    if (adminModeEnabled && onEdit) {
+      onEdit(building);
+      map.flyTo([building.coordinates.lat, building.coordinates.lng], 15, {
+        duration: 1.5,
+        easeLinearity: 0.25
+      });
+      return;
+    }
+    
     // Trigger hearts animation on single click for Nick pin
     if (isNick && onTripleClick) {
       onTripleClick();

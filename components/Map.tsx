@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Coordinates, Building } from '../types';
 import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM } from '../constants';
@@ -146,6 +146,33 @@ const LCPOptimizer: React.FC = () => {
   return null;
 };
 
+// Component to handle map clicks (only when admin mode is enabled)
+interface MapClickHandlerProps {
+  enabled: boolean;
+  onMapClick: (coordinates: Coordinates) => void;
+}
+
+const MapClickHandler: React.FC<MapClickHandlerProps> = ({ enabled, onMapClick }) => {
+  useMapEvents({
+    click: (e) => {
+      if (enabled) {
+        // Check if click target is a marker - if so, don't trigger map click
+        const target = e.originalEvent.target as HTMLElement;
+        const isMarker = target.closest('.leaflet-marker-icon') || target.closest('.leaflet-popup');
+        
+        if (!isMarker) {
+          onMapClick({
+            lat: e.latlng.lat,
+            lng: e.latlng.lng,
+          });
+        }
+      }
+    },
+  });
+  
+  return null;
+};
+
 interface MapProps {
   center: Coordinates;
   buildings: Building[];
@@ -154,9 +181,12 @@ interface MapProps {
   onBoundsRequest?: (getBounds: () => { north: number; south: number; east: number; west: number } | null) => void;
   theme: 'dark' | 'light';
   onNickTripleClick?: () => void;
+  adminModeEnabled?: boolean;
+  onMapClick?: (coordinates: Coordinates) => void;
+  onEditBuilding?: (building: Building) => void;
 }
 
-export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick }) => {
+export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick, adminModeEnabled = false, onMapClick, onEditBuilding }) => {
   const isDark = theme === 'dark';
   const colors = getThemeColors(theme);
 
@@ -173,7 +203,7 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
       markerZoomAnimation={true}
     >
       <TileLayer
-        attribution={MAP_ATTRIBUTION}
+        attribution="" // Hide attribution
         url={isDark ? MAP_TILE_URL_DARK : MAP_TILE_URL_LIGHT}
         maxZoom={19}
         minZoom={0}
@@ -185,12 +215,15 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
         updateWhenIdle={true}
         noWrap={false}
       />
-      <ZoomControl position="topright" />
+      {/* Zoom controls hidden */}
       
       <MapSizeFixer />
       <MapUpdater center={center} />
       <MapBoundsTracker onBoundsRequest={onBoundsRequest} />
       <LCPOptimizer />
+      {adminModeEnabled && onMapClick && (
+        <MapClickHandler enabled={adminModeEnabled} onMapClick={onMapClick} />
+      )}
 
       {buildings.map((b) => (
         <BuildingMarker
@@ -199,6 +232,8 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
           isSelected={selectedBuilding?.id === b.id}
           onSelect={onSelectBuilding}
           onTripleClick={b.name === "Nick" ? onNickTripleClick : undefined}
+          adminModeEnabled={adminModeEnabled}
+          onEdit={onEditBuilding}
         />
       ))}
     </MapContainer>

@@ -14,6 +14,10 @@ const POIConfirmationModal = lazy(() =>
 const DeleteBuildingModal = lazy(() => 
   import('./components/DeleteBuildingModal').then(module => ({ default: module.DeleteBuildingModal }))
 );
+const BuildingEditorModal = lazy(() => 
+  import('./components/BuildingEditorModal').then(module => ({ default: module.BuildingEditorModal }))
+);
+import { AdminToggle } from './components/AdminToggle';
 import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding, isPOIQuery, searchPOIByName, checkPOIStyleCriteria } from './services/geminiService';
 import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow, hideBuildingInBaserow } from './services/baserowService';
@@ -44,6 +48,11 @@ function App() {
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
   const [poiConfirmationBuilding, setPOIConfirmationBuilding] = useState<Building | null>(null);
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null);
+  const [adminModeEnabled, setAdminModeEnabled] = useState(false);
+  const [showEditorModal, setShowEditorModal] = useState(false);
+  const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
+  const [clickedCoordinates, setClickedCoordinates] = useState<Coordinates | null>(null);
+  const [buttonsVisible, setButtonsVisible] = useState(false);
   const [blacklistedBuildingIds, setBlacklistedBuildingIds] = useState<Set<number>>(() => {
     // Load blacklisted IDs from localStorage
     if (typeof window !== 'undefined') {
@@ -85,6 +94,24 @@ function App() {
       window.localStorage.setItem('evil-atlas-theme', theme);
     }
   }, [theme]);
+
+  // Keyboard handler for H key to toggle button visibility
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only toggle if not typing in an input/textarea
+      if (e.key === 'h' || e.key === 'H') {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable) {
+          setButtonsVisible(prev => !prev);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
 
 
   // Helper to normalize names for fuzzy matching
@@ -1139,12 +1166,79 @@ function App() {
   }, []);
 
   const handleSelectBuilding = (b: Building) => {
-    setSelectedBuilding(b);
+    // Don't show building details if admin mode is enabled (edit modal will be shown instead)
+    if (!adminModeEnabled) {
+      setSelectedBuilding(b);
+    }
   };
 
   const handleCloseDetails = () => {
     setSelectedBuilding(null);
   };
+
+  // Admin mode handlers
+  const handleMapClick = useCallback((coordinates: Coordinates) => {
+    if (adminModeEnabled) {
+      setClickedCoordinates(coordinates);
+      setEditingBuilding(null);
+      setShowEditorModal(true);
+    }
+  }, [adminModeEnabled]);
+
+  const handleEditBuilding = useCallback((building: Building) => {
+    if (adminModeEnabled) {
+      setEditingBuilding(building);
+      setClickedCoordinates(null);
+      setShowEditorModal(true);
+    }
+  }, [adminModeEnabled]);
+
+  const handleSaveBuilding = useCallback(async (buildingData: Building) => {
+    try {
+      setLoading(true);
+      
+      if (editingBuilding) {
+        // Update existing building
+        const rowIdMatch = editingBuilding.id.match(/^baserow-(\d+)$/);
+        if (!rowIdMatch) {
+          throw new Error('Cannot update non-Baserow building');
+        }
+        
+        const rowId = parseInt(rowIdMatch[1], 10);
+        const updatedBuilding = await updateBuildingInBaserow(rowId, buildingData);
+        
+        // Update local state
+        setBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
+        setAllBaserowBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
+        
+        setStatusMessage(`Updated "${updatedBuilding.name}"`);
+        console.log(`✅ Updated building "${updatedBuilding.name}" in Baserow`);
+      } else {
+        // Create new building
+        const savedBuilding = await saveBuildingToBaserow(buildingData);
+        
+        // Add to local state
+        setBuildings(prev => mergeBuildings(prev, [savedBuilding]));
+        setAllBaserowBuildings(prev => mergeBuildings(prev, [savedBuilding]));
+        
+        // Move map to new building
+        setCenter(savedBuilding.coordinates);
+        
+        setStatusMessage(`Added "${savedBuilding.name}" to database`);
+        console.log(`✅ Added building "${savedBuilding.name}" to Baserow`);
+      }
+      
+      setShowEditorModal(false);
+      setEditingBuilding(null);
+      setClickedCoordinates(null);
+    } catch (error) {
+      console.error('Failed to save building:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  }, [editingBuilding]);
 
   // Handler for Nick triple-click - show falling hearts
   const handleNickTripleClick = useCallback(() => {
@@ -1434,6 +1528,10 @@ function App() {
   return (
     <>
       <style>{`
+        /* Hide Leaflet attribution */
+        .leaflet-control-attribution {
+          display: none !important;
+        }
         .dedupe-button {
           bottom: calc(1rem + 16px) !important;
         }
@@ -1460,6 +1558,16 @@ function App() {
           .force-gemini-button {
             bottom: calc(1.5rem + 16px) !important;
             right: calc(1.5rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
+          }
+        }
+        .admin-toggle-button {
+          bottom: calc(1rem + 16px) !important;
+          right: calc(1rem + 12px + 4px + 12px + 4px + 12px + 4px) !important; /* force gemini (12px) + gap (4px) + backfill (12px) + gap (4px) + dedupe (12px) + gap (4px) */
+        }
+        @media (min-width: 768px) {
+          .admin-toggle-button {
+            bottom: calc(1.5rem + 16px) !important;
+            right: calc(1.5rem + 12px + 4px + 12px + 4px + 12px + 4px) !important; /* force gemini (12px) + gap (4px) + backfill (12px) + gap (4px) + dedupe (12px) + gap (4px) */
           }
         }
       `}</style>
@@ -1489,6 +1597,9 @@ function App() {
           onBoundsRequest={handleBoundsRequest}
           theme={theme}
           onNickTripleClick={handleNickTripleClick}
+          adminModeEnabled={adminModeEnabled}
+          onMapClick={handleMapClick}
+          onEditBuilding={handleEditBuilding}
         />
         {/* Map color overlay - only in dark mode */}
         {theme === 'dark' && (
@@ -1626,49 +1737,55 @@ function App() {
       </div>
 
       {/* Subtle force Gemini search button - bottom right (left of backfill) */}
-      <button
-        onClick={handleForceGeminiSearchClick}
-        className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 force-gemini-button"
-        style={{ 
-          width: '12px', 
-          height: '12px', 
-          opacity: 0.08
-        }}
-        aria-label="Force Gemini search (double-click)"
-        title="Double-click to force Gemini search (bypasses 5 building limit)"
-      >
-        <div className="w-full h-full bg-white rounded-sm" />
-      </button>
+      {buttonsVisible && (
+        <button
+          onClick={handleForceGeminiSearchClick}
+          className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 force-gemini-button"
+          style={{ 
+            width: '12px', 
+            height: '12px', 
+            opacity: 0.08
+          }}
+          aria-label="Force Gemini search (double-click)"
+          title="Double-click to force Gemini search (bypasses 5 building limit)"
+        >
+          <div className="w-full h-full bg-white rounded-sm" />
+        </button>
+      )}
 
       {/* Subtle backfill images button - bottom right (left of dedupe) */}
-      <button
-        onClick={handleBackfillImagesButtonClick}
-        className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 backfill-button"
-        style={{ 
-          width: '12px', 
-          height: '12px', 
-          opacity: 0.08
-        }}
-        aria-label="Backfill images (double-click)"
-        title="Double-click to backfill images"
-      >
-        <div className="w-full h-full bg-white rounded-sm" />
-      </button>
+      {buttonsVisible && (
+        <button
+          onClick={handleBackfillImagesButtonClick}
+          className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 backfill-button"
+          style={{ 
+            width: '12px', 
+            height: '12px', 
+            opacity: 0.08
+          }}
+          aria-label="Backfill images (double-click)"
+          title="Double-click to backfill images"
+        >
+          <div className="w-full h-full bg-white rounded-sm" />
+        </button>
+      )}
 
       {/* Subtle dedupe button - bottom right */}
-      <button
-        onClick={handleDedupeButtonClick}
-        className="absolute right-4 md:right-6 z-10 cursor-pointer transition-opacity hover:opacity-20 dedupe-button"
-        style={{ 
-          width: '12px', 
-          height: '12px', 
-          opacity: 0.05
-        }}
-        aria-label="Dedupe buildings (double-click)"
-        title="Double-click to dedupe"
-      >
-        <div className="w-full h-full bg-white rounded-sm" />
-      </button>
+      {buttonsVisible && (
+        <button
+          onClick={handleDedupeButtonClick}
+          className="absolute right-4 md:right-6 z-10 cursor-pointer transition-opacity hover:opacity-20 dedupe-button"
+          style={{ 
+            width: '12px', 
+            height: '12px', 
+            opacity: 0.05
+          }}
+          aria-label="Dedupe buildings (double-click)"
+          title="Double-click to dedupe"
+        >
+          <div className="w-full h-full bg-white rounded-sm" />
+        </button>
+      )}
 
       {/* Falling hearts animation */}
       {showFallingHearts && (
@@ -1764,6 +1881,32 @@ function App() {
             }}
           />
         </Suspense>
+      )}
+
+      {/* Building Editor Modal */}
+      {showEditorModal && (
+        <Suspense fallback={null}>
+          <BuildingEditorModal
+            building={editingBuilding}
+            coordinates={clickedCoordinates}
+            onSave={handleSaveBuilding}
+            onCancel={() => {
+              setShowEditorModal(false);
+              setEditingBuilding(null);
+              setClickedCoordinates(null);
+            }}
+            theme={theme}
+          />
+        </Suspense>
+      )}
+
+      {/* Admin Toggle */}
+      {buttonsVisible && (
+        <AdminToggle
+          enabled={adminModeEnabled}
+          onToggle={setAdminModeEnabled}
+          theme={theme}
+        />
       )}
 
       {/* Branding overlay (bottom right) - Removed for clean aesthetic */}
