@@ -40,7 +40,10 @@ export enum ArchitecturalStyle {
   CATHEDRAL = 'Cathedral',
   
   // Fallback
-  OTHER = 'Other'
+  OTHER = 'Other',
+  
+  // Special Style
+  DISGUSTING = 'Disgusting'
 }
 
 export interface Building {
@@ -52,13 +55,15 @@ export interface Building {
   coordinates: Coordinates;
   gmapsUrl?: string; // Google Maps URL (preferred over groundingUrl)
   groundingUrl?: string; // Deprecated: Use gmapsUrl instead
-  imageUrl?: string; // URL from Google Search
+  imageUrl?: string; // URL from Google Search (legacy, use imageUrls for multiple images)
+  imageUrls?: string[]; // Array of image URLs (from Baserow file fields image_1, image_2, image_3)
   city?: string; // Extracted city name
   country?: string; // Extracted country name
   googlePlaceId?: string; // Google Place ID - use this to construct proper place URLs
   isPrioritized?: boolean; // True for historically significant Art Deco buildings by famous architects
   architect?: string; // Name of architect if well-known
   hasPurpleHeart?: boolean; // True for special romantic locations that get purple glowing hearts
+  source?: string; // Source of building entry (e.g., 'manual' for manually added)
 }
 
 export interface MapViewState {

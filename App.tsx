@@ -1193,7 +1193,7 @@ function App() {
     }
   }, [adminModeEnabled]);
 
-  const handleSaveBuilding = useCallback(async (buildingData: Building) => {
+  const handleSaveBuilding = useCallback(async (buildingData: Building, imageFiles?: File[]) => {
     try {
       setLoading(true);
       
@@ -1205,7 +1205,7 @@ function App() {
         }
         
         const rowId = parseInt(rowIdMatch[1], 10);
-        const updatedBuilding = await updateBuildingInBaserow(rowId, buildingData);
+        const updatedBuilding = await updateBuildingInBaserow(rowId, buildingData, imageFiles);
         
         // Update local state
         setBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
@@ -1215,7 +1215,7 @@ function App() {
         console.log(`✅ Updated building "${updatedBuilding.name}" in Baserow`);
       } else {
         // Create new building
-        const savedBuilding = await saveBuildingToBaserow(buildingData);
+        const savedBuilding = await saveBuildingToBaserow(buildingData, imageFiles);
         
         // Add to local state
         setBuildings(prev => mergeBuildings(prev, [savedBuilding]));

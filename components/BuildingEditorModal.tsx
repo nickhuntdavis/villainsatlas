@@ -8,7 +8,7 @@ import { reverseGeocode } from '../services/geocodingService';
 interface BuildingEditorModalProps {
   building: Building | null; // null = add mode, Building = edit mode
   coordinates: Coordinates | null; // For add mode, coordinates from map click
-  onSave: (building: Building) => Promise<void>;
+  onSave: (building: Building, imageFiles?: File[]) => Promise<void>;
   onCancel: () => void;
   theme: 'dark' | 'light';
 }
@@ -26,7 +26,6 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
   // Form state
   const [name, setName] = useState(building?.name || '');
   const [notes, setNotes] = useState(building?.description || '');
-  const [imageUrl, setImageUrl] = useState(building?.imageUrl || '');
   const [architect, setArchitect] = useState(building?.architect || '');
   const [style, setStyle] = useState<ArchitecturalStyle | ''>(building?.style || '');
   const [location, setLocation] = useState(building?.location || '');
@@ -34,11 +33,11 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
     building?.coordinates || coordinates || { lat: 0, lng: 0 }
   );
   
-  // File upload state
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFileError, setImageFileError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Multiple image upload state (up to 3 images)
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null]);
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null]);
+  const [imageFileErrors, setImageFileErrors] = useState<(string | null)[]>([null, null, null]);
+  const fileInputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
   
   // Loading state
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
@@ -77,38 +76,75 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
           }
         });
       }
+      
+      // Load existing images if editing
+      if (building.imageUrls && building.imageUrls.length > 0) {
+        // Set previews from existing URLs (for display only, not for re-upload)
+        const previews: (string | null)[] = [null, null, null];
+        building.imageUrls.slice(0, 3).forEach((url, index) => {
+          previews[index] = url;
+        });
+        setImagePreviews(previews);
+      }
     }
   }, [building]);
   
-  // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload for a specific slot
+  const handleFileChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setImageFileError('Please select an image file');
+      const newErrors = [...imageFileErrors];
+      newErrors[index] = 'Please select an image file';
+      setImageFileErrors(newErrors);
       return;
     }
     
     // Validate file size (max 5MB)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      setImageFileError('File size must be less than 5MB. Please use a URL instead.');
+      const newErrors = [...imageFileErrors];
+      newErrors[index] = 'File size must be less than 5MB';
+      setImageFileErrors(newErrors);
       return;
     }
     
-    setImageFileError(null);
-    setImageFile(file);
+    // Clear error
+    const newErrors = [...imageFileErrors];
+    newErrors[index] = null;
+    setImageFileErrors(newErrors);
+    
+    // Set file
+    const newFiles = [...imageFiles];
+    newFiles[index] = file;
+    setImageFiles(newFiles);
     
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-      // Set imageUrl to data URL for saving
-      setImageUrl(reader.result as string);
+      const newPreviews = [...imagePreviews];
+      newPreviews[index] = reader.result as string;
+      setImagePreviews(newPreviews);
     };
     reader.readAsDataURL(file);
+  };
+  
+  // Clear image at specific slot
+  const clearImage = (index: number) => {
+    const newFiles = [...imageFiles];
+    const newPreviews = [...imagePreviews];
+    const newErrors = [...imageFileErrors];
+    newFiles[index] = null;
+    newPreviews[index] = null;
+    newErrors[index] = null;
+    setImageFiles(newFiles);
+    setImagePreviews(newPreviews);
+    setImageFileErrors(newErrors);
+    if (fileInputRefs[index].current) {
+      fileInputRefs[index].current!.value = '';
+    }
   };
   
   // Handle form submission
@@ -134,6 +170,9 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
     setIsSaving(true);
     
     try {
+      // Collect files that are actually provided
+      const filesToUpload = imageFiles.filter((file): file is File => file !== null);
+      
       const buildingData: Building = {
         id: building?.id || `temp-${Date.now()}`,
         name: name.trim(),
@@ -142,16 +181,16 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
         coordinates: formCoordinates,
         style: style || undefined,
         architect: architect.trim() || undefined,
-        imageUrl: imageUrl.trim() || undefined,
         city: building?.city,
         country: building?.country,
         googlePlaceId: building?.googlePlaceId,
         gmapsUrl: building?.gmapsUrl,
         isPrioritized: building?.isPrioritized,
         hasPurpleHeart: building?.hasPurpleHeart,
+        source: 'manual', // Mark as manually added
       };
       
-      await onSave(buildingData);
+      await onSave(buildingData, filesToUpload.length > 0 ? filesToUpload : undefined);
       onCancel();
     } catch (error) {
       console.error('Failed to save building:', error);
@@ -255,84 +294,71 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
             />
           </div>
 
-          {/* Image - URL or File Upload */}
+          {/* Images - Up to 3 File Uploads */}
           <div>
             <label className={`${typography.label.default} text-[#FDFEFF] block mb-2`}>
-              Image
+              Images (up to 3)
             </label>
-            <div className="space-y-2">
-              {/* URL Input */}
-              <input
-                type="url"
-                value={imageUrl && !imageUrl.startsWith('data:') ? imageUrl : ''}
-                onChange={(e) => {
-                  setImageUrl(e.target.value);
-                  setImageFile(null);
-                  setImagePreview(null);
-                }}
-                placeholder="Image URL"
-                className="w-full px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
-                disabled={isSaving || !!imageFile}
-              />
-              
-              {/* File Upload */}
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  disabled={isSaving}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${
-                    imageFile
-                      ? 'bg-[#1A1D3A] text-[#BAB2CF] border border-[#BAB2CF]/20'
-                      : 'bg-[#1A1D3A] text-[#FDFEFF] border border-[#BAB2CF]/20 hover:border-[#FF5D88]'
-                  }`}
-                  disabled={isSaving}
-                >
-                  <Upload size={16} />
-                  {imageFile ? 'Change Image' : 'Upload Image'}
-                </button>
-                {imageFile && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageFile(null);
-                      setImagePreview(null);
-                      setImageUrl('');
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                    className="px-3 py-2 text-[#BAB2CF] hover:text-[#FDFEFF] text-sm"
-                    disabled={isSaving}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              
-              {/* Error message */}
-              {imageFileError && (
-                <p className="text-sm text-[#FF5D88]">{imageFileError}</p>
-              )}
-              
-              {/* Preview */}
-              {(imagePreview || (imageUrl && !imageUrl.startsWith('data:') && imageUrl)) && (
-                <div className="mt-2 rounded-lg overflow-hidden border border-[#BAB2CF]/20">
-                  <img
-                    src={imagePreview || imageUrl}
-                    alt="Preview"
-                    className="w-full h-48 object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
+            <div className="space-y-4">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`${typography.label.badge} text-[#BAB2CF] w-20`}>
+                      Image {index + 1}:
+                    </span>
+                    <input
+                      ref={fileInputRefs[index]}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange(index)}
+                      className="hidden"
+                      disabled={isSaving}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRefs[index].current?.click()}
+                      className={`flex-1 px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${
+                        imageFiles[index]
+                          ? 'bg-[#1A1D3A] text-[#BAB2CF] border border-[#BAB2CF]/20'
+                          : 'bg-[#1A1D3A] text-[#FDFEFF] border border-[#BAB2CF]/20 hover:border-[#FF5D88]'
+                      }`}
+                      disabled={isSaving}
+                    >
+                      <Upload size={16} />
+                      {imageFiles[index] ? 'Change Image' : 'Upload Image'}
+                    </button>
+                    {imageFiles[index] && (
+                      <button
+                        type="button"
+                        onClick={() => clearImage(index)}
+                        className="px-3 py-2 text-[#BAB2CF] hover:text-[#FDFEFF] text-sm"
+                        disabled={isSaving}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Error message */}
+                  {imageFileErrors[index] && (
+                    <p className="text-sm text-[#FF5D88] ml-24">{imageFileErrors[index]}</p>
+                  )}
+                  
+                  {/* Preview */}
+                  {imagePreviews[index] && (
+                    <div className="ml-24 mt-2 rounded-lg overflow-hidden border border-[#BAB2CF]/20">
+                      <img
+                        src={imagePreviews[index]!}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-48 object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
           </div>
 

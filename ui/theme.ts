@@ -113,6 +113,8 @@ export const typography = {
   },
   // Labels & Badges - Inter, less aggressive
   label: {
+    default: `${fontFamily.body} text-sm font-medium`,
+    heading: `${fontFamily.heading} text-xl font-normal leading-tight`,
     badge: `${fontFamily.body} text-xs font-medium tracking-wide`,
     button: `${fontFamily.body} text-sm font-medium tracking-wide`,
   },

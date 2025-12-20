@@ -22,6 +22,9 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   // Check if this is Palace of Culture and Science
   const isPalaceOfCulture = building.name === "Palace of Culture and Science";
   
+  // Check if building has "Disgusting" style - show red heart icon
+  const isDisgusting = building.style && building.style.toString().includes('Disgusting');
+  
   // Use primary (first) style for color - prioritized buildings are bigger and have glow but same color
   const color = getPrimaryStyleColor(building.style);
 
@@ -50,13 +53,14 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   };
 
   // Use the design system MarkerIcon atom
+  // Priority: Nick > Disgusting style > hasPurpleHeart > standard
   const icon = createMarkerIcon({
     color,
     isSelected,
-    variant: isNick ? 'nick' : building.hasPurpleHeart ? 'purpleHeart' : 'standard',
-    isPrioritized: building.isPrioritized && !isPalaceOfCulture && !building.hasPurpleHeart,
+    variant: isNick ? 'nick' : (isDisgusting || building.hasPurpleHeart) ? 'purpleHeart' : 'standard',
+    isPrioritized: building.isPrioritized && !isPalaceOfCulture && !building.hasPurpleHeart && !isDisgusting,
     isPalaceOfCulture: isPalaceOfCulture,
-    hasPurpleHeart: building.hasPurpleHeart || false,
+    hasPurpleHeart: building.hasPurpleHeart || isDisgusting || false,
   });
 
   return (

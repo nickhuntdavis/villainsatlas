@@ -20,6 +20,14 @@ const getDistance = (coord1: Coordinates, coord2: Coordinates): number => {
   return R * c;
 };
 
+// Baserow file field format (what we get from API)
+interface BaserowFileField {
+  name: string;
+  url: string;
+  size?: number;
+  mime_type?: string;
+}
+
 // Baserow row format (what we get from API)
 interface BaserowRow {
   id: number;
@@ -31,6 +39,9 @@ interface BaserowRow {
   google_place_id?: string;
   Gmaps_url?: string;
   image_url?: string;
+  image_1?: BaserowFileField[] | null; // File field - array of file objects
+  image_2?: BaserowFileField[] | null;
+  image_3?: BaserowFileField[] | null;
   notes?: string;
   style?: string; // Architectural style
   architect?: string; // Architect name if available
@@ -38,6 +49,7 @@ interface BaserowRow {
   is_prioritized?: boolean; // Whether building is prioritized (Art Deco by famous architect)
   is_hidden?: boolean; // Whether building is hidden (soft-deleted)
   is_purple_heart?: boolean; // Whether building should have a purple glowing heart
+  source?: string; // Source of building entry (e.g., 'manual')
 }
 
 // Extended Building interface for saving (includes Baserow-specific fields)
@@ -60,6 +72,43 @@ const extractUrlFromMarkdown = (urlString: string | undefined): string | undefin
   
   // If not markdown, return as-is
   return urlString;
+};
+
+// Upload a file to Baserow and return the file object
+export const uploadFileToBaserow = async (file: File): Promise<BaserowFileField> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Baserow file upload endpoint
+    const uploadUrl = 'https://api.baserow.io/api/user-files/upload-file/';
+    
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${API_TOKEN}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Baserow file upload error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Baserow returns file object with name, url, size, mime_type
+    return {
+      name: data.name || file.name,
+      url: data.url || data.thumbnails?.url || data.original || '',
+      size: data.size || file.size,
+      mime_type: data.mime_type || file.type,
+    };
+  } catch (error) {
+    console.error('Error uploading file to Baserow:', error);
+    throw error;
+  }
 };
 
 // Convert Baserow row to Building type
@@ -86,11 +135,33 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
   const hasPurpleHeart = row.is_purple_heart === true || 
     purpleHeartBuildings.some(purpleName => row.name === purpleName);
 
-  // Extract image URL from markdown format if present
+  // Extract image URLs from file fields (image_1, image_2, image_3)
+  const imageUrls: string[] = [];
+  
+  // Helper to extract URL from file field (can be array or single object)
+  const extractFileUrl = (field: BaserowFileField[] | BaserowFileField | null | undefined): string | null => {
+    if (!field) return null;
+    if (Array.isArray(field) && field.length > 0) {
+      return field[0].url || null;
+    }
+    if (typeof field === 'object' && 'url' in field) {
+      return field.url || null;
+    }
+    return null;
+  };
+  
+  // Extract URLs from file fields
+  const img1Url = extractFileUrl(row.image_1);
+  const img2Url = extractFileUrl(row.image_2);
+  const img3Url = extractFileUrl(row.image_3);
+  
+  if (img1Url) imageUrls.push(img1Url);
+  if (img2Url) imageUrls.push(img2Url);
+  if (img3Url) imageUrls.push(img3Url);
+  
+  // Fallback to legacy image_url if no file field images
   const rawImageUrl = extractUrlFromMarkdown(row.image_url);
-  // Allow all image URLs for display (previously only allowed Google Places)
-  // This ensures images like Nick's can display even if not from Google Places
-  const imageUrl = rawImageUrl || undefined;
+  const imageUrl = imageUrls.length > 0 ? undefined : (rawImageUrl || undefined);
 
   // Auto-detect Cathedral from notes if not already in style
   let style = row.style || "";
@@ -117,9 +188,11 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     gmapsUrl: row.Gmaps_url,
     googlePlaceId: row.google_place_id,
     imageUrl: imageUrl,
+    imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
     isPrioritized: !!isPrioritized,
     architect: row.architect || undefined,
     hasPurpleHeart: !!hasPurpleHeart,
+    source: row.source || undefined,
   };
 };
 
@@ -263,7 +336,7 @@ export const fetchBuildingByName = async (name: string): Promise<Building | null
 };
 
 // Save a building to Baserow
-export const saveBuildingToBaserow = async (building: Building): Promise<Building> => {
+export const saveBuildingToBaserow = async (building: Building, imageFiles?: File[]): Promise<Building> => {
   try {
     // Validate coordinates
     if (!building.coordinates || 
@@ -296,7 +369,21 @@ export const saveBuildingToBaserow = async (building: Building): Promise<Buildin
     // Prioritize gmapsUrl over groundingUrl (for backward compatibility)
     const gmapsUrl = building.gmapsUrl || building.groundingUrl || "";
 
-    const payload = {
+    // Upload files if provided
+    const uploadedFiles: (BaserowFileField | null)[] = [null, null, null];
+    if (imageFiles && imageFiles.length > 0) {
+      for (let i = 0; i < Math.min(imageFiles.length, 3); i++) {
+        try {
+          const uploadedFile = await uploadFileToBaserow(imageFiles[i]);
+          uploadedFiles[i] = uploadedFile;
+        } catch (error) {
+          console.error(`Failed to upload image ${i + 1} for "${building.name}":`, error);
+          // Continue with other images even if one fails
+        }
+      }
+    }
+
+    const payload: any = {
       name: building.name,
       city: city || "",
       country: country || "",
@@ -311,7 +398,13 @@ export const saveBuildingToBaserow = async (building: Building): Promise<Buildin
       architect: building.architect || "",
       is_prioritized: building.isPrioritized || false,
       is_purple_heart: building.hasPurpleHeart || false,
+      source: building.source || "",
     };
+
+    // Add file fields (Baserow expects array format for file fields)
+    if (uploadedFiles[0]) payload.image_1 = [uploadedFiles[0]];
+    if (uploadedFiles[1]) payload.image_2 = [uploadedFiles[1]];
+    if (uploadedFiles[2]) payload.image_3 = [uploadedFiles[2]];
 
     // Log what we're saving for debugging
     console.log(`Saving "${building.name}" to Baserow:`, {
@@ -453,7 +546,7 @@ export const hideBuildingInBaserow = async (rowId: number): Promise<void> => {
 };
 
 // Update an existing building in Baserow
-export const updateBuildingInBaserow = async (rowId: number, building: Building): Promise<Building> => {
+export const updateBuildingInBaserow = async (rowId: number, building: Building, imageFiles?: File[]): Promise<Building> => {
   try {
     // Use city/country from building if available, otherwise try to parse from location
     let city = (building as BuildingForSave).city || "";
@@ -475,6 +568,20 @@ export const updateBuildingInBaserow = async (rowId: number, building: Building)
     // Prioritize gmapsUrl over groundingUrl (for backward compatibility)
     const gmapsUrl = building.gmapsUrl || building.groundingUrl || "";
 
+    // Upload files if provided
+    const uploadedFiles: (BaserowFileField | null)[] = [null, null, null];
+    if (imageFiles && imageFiles.length > 0) {
+      for (let i = 0; i < Math.min(imageFiles.length, 3); i++) {
+        try {
+          const uploadedFile = await uploadFileToBaserow(imageFiles[i]);
+          uploadedFiles[i] = uploadedFile;
+        } catch (error) {
+          console.error(`Failed to upload image ${i + 1} for "${building.name}":`, error);
+          // Continue with other images even if one fails
+        }
+      }
+    }
+
     const basePayload: any = {
       name: building.name,
       city: city || "",
@@ -489,7 +596,13 @@ export const updateBuildingInBaserow = async (rowId: number, building: Building)
       architect: building.architect || "",
       is_prioritized: building.isPrioritized || false,
       is_purple_heart: building.hasPurpleHeart || false,
+      source: building.source || "",
     };
+
+    // Add file fields if files were uploaded (Baserow expects array format for file fields)
+    if (uploadedFiles[0]) basePayload.image_1 = [uploadedFiles[0]];
+    if (uploadedFiles[1]) basePayload.image_2 = [uploadedFiles[1]];
+    if (uploadedFiles[2]) basePayload.image_3 = [uploadedFiles[2]];
 
     // Only update image_url when we explicitly have one; otherwise preserve existing Baserow value
     const payload = building.imageUrl

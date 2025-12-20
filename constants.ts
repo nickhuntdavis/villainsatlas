@@ -65,6 +65,7 @@ export const normalizeStyle = (style: string | undefined): string => {
   if (normalized.includes('monumental')) return 'Monumental';
   if (normalized.includes('fortress') || normalized.includes('bunker')) return 'Fortress';
   if (normalized.includes('cyberpunk') || normalized.includes('dystopian')) return normalized.includes('cyberpunk') ? 'Cyberpunk' : 'Dystopian';
+  if (normalized.includes('disgusting')) return 'Disgusting';
   
   // Return original if no match (allows for new styles)
   return style;
@@ -124,6 +125,7 @@ export const GENRE_COLORS: Record<string, string> = {
   'Bunker': '#8E8E8E',                  // Darker neutral grey
   'Cyberpunk': '#828282',               // Dark neutral grey
   'Dystopian': '#767676',               // Darkest neutral grey
+  'Disgusting': '#FF5D88',              // Red (same as Nick's heart and romantic locations)
   
   // Fallback
   'Other': '#909090',                   // Medium neutral grey

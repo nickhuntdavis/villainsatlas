@@ -3,6 +3,7 @@ import { Building, Coordinates } from '../types';
 import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
+import { ImageGallery } from './ImageGallery';
 
 interface BuildingDetailsProps {
   building: Building | null;
@@ -61,8 +62,10 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
 
   if (!building) return null;
 
-  // Extract clean image URL (handle markdown format)
-  const cleanImageUrl = extractUrlFromMarkdown(building.imageUrl);
+  // Get images - prefer imageUrls array, fallback to legacy imageUrl
+  const images = building.imageUrls && building.imageUrls.length > 0
+    ? building.imageUrls
+    : (building.imageUrl ? [extractUrlFromMarkdown(building.imageUrl)].filter(Boolean) as string[] : []);
 
   // Parse multiple styles (comma-separated) and get primary style color
   const styles = building.style ? normalizeStyles(building.style) : ['Other'];
@@ -76,18 +79,8 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
       
       {/* Image Header */}
       <div className="relative w-full overflow-hidden shrink-0 bg-[#020716]">
-        {cleanImageUrl && !imgError ? (
-          <div className="relative w-full h-full group">
-             <img 
-              src={cleanImageUrl}
-              alt={building.name}
-              className="w-full h-auto max-h-[32rem] object-contain transition-opacity duration-300"
-              onError={(e) => {
-                console.warn('Image failed to load:', cleanImageUrl, e);
-                setImgError(true);
-              }}
-            />
-          </div>
+        {images.length > 0 ? (
+          <ImageGallery images={images} buildingName={building.name} />
         ) : null}
       </div>
 
