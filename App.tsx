@@ -1606,6 +1606,36 @@ function App() {
         statusMessage={statusMessage}
         theme={theme}
         isSidebarOpen={!!selectedBuilding}
+        allBuildings={allBaserowBuildings}
+        onSelectBuilding={async (building) => {
+          setSelectedBuilding(building);
+          setCenter(building.coordinates);
+          
+          // Load nearby Baserow buildings so pins are visible
+          try {
+            const nearbyBuildings = await getBaserowBuildingsNear(building.coordinates, 50000); // 50km radius
+            console.log(`Found ${nearbyBuildings.length} nearby buildings for autosuggest selection`);
+            
+            // Ensure the selected building is included in results
+            const buildingsToShow = nearbyBuildings.some(b => b.id === building.id)
+              ? nearbyBuildings
+              : [...nearbyBuildings, building];
+            
+            // Sort results: prioritized buildings first
+            const sortedResults = buildingsToShow.sort((a, b) => {
+              if (a.isPrioritized && !b.isPrioritized) return -1;
+              if (!a.isPrioritized && b.isPrioritized) return 1;
+              return 0;
+            });
+            
+            // Merge with existing buildings
+            setBuildings((prev) => mergeBuildings(prev, sortedResults));
+          } catch (err) {
+            console.error("Error loading nearby buildings for autosuggest selection:", err);
+            // Still show the selected building even if loading nearby fails
+            setBuildings((prev) => mergeBuildings(prev, [building]));
+          }
+        }}
       />
 
       {/* Search FABs - Bottom Right */}
