@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Villain's Atlas</title>
+    <title>AN Atlas</title>
     <link rel="icon" type="image/svg+xml" href="/images/palace.svg" />
     <!-- Resource hints for external APIs -->
     <link rel="preconnect" href="https://api.baserow.io">
@@ -93,31 +93,30 @@
       }
       .leaflet-tile-pane {
         z-index: 2;
-        background-color: #020B21 !important;
+        background-color: transparent !important;
       }
-      /* Set unloaded tile areas to custom color instead of grey */
-      .leaflet-tile-container {
-        background-color: #020B21 !important;
-      }
+      /* Leaflet tile pane and all its layers are transparent - no background colors */
+      .leaflet-tile-pane *,
+      .leaflet-tile-container,
       .leaflet-tile {
-        background-color: #020B21 !important;
+        background-color: transparent !important;
       }
       /* Target the actual tile image placeholders */
       .leaflet-tile-pane img {
-        background-color: #020B21 !important;
+        background-color: transparent !important;
       }
       /* Target empty/loading tiles */
       .leaflet-tile-container img[src=""],
       .leaflet-tile-container img:not([src]),
       img.leaflet-tile[src=""],
       img.leaflet-tile:not([src]) {
-        background-color: #020B21 !important;
+        background-color: transparent !important;
         background-image: none !important;
       }
       /* Override any grey backgrounds Leaflet might set */
       .leaflet-tile-loaded,
       .leaflet-tile-loading {
-        background-color: #020B21 !important;
+        background-color: transparent !important;
       }
       /* Apply Inter as default body font */
       body {

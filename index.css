@@ -20,16 +20,15 @@ button:disabled {
   background-color: #020B21 !important;
 }
 
+/* Leaflet tile pane and all its layers are transparent - no background colors */
 .leaflet-tile-pane,
+.leaflet-tile-pane *,
 .leaflet-tile-container,
-.leaflet-tile {
-  background-color: #020B21 !important;
-}
-
+.leaflet-tile,
 .leaflet-tile-pane img,
 .leaflet-tile-container img,
 img.leaflet-tile {
-  background-color: #020B21 !important;
+  background-color: transparent !important;
 }
 
 /* Target loading/empty tiles specifically */
@@ -39,7 +38,7 @@ img.leaflet-tile[src=""],
 img.leaflet-tile:not([src]),
 .leaflet-tile-loaded,
 .leaflet-tile-loading {
-  background-color: #020B21 !important;
+  background-color: transparent !important;
   background-image: none !important;
 }
 

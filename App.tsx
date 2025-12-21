@@ -40,7 +40,12 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem('evil-atlas-theme');
-      if (stored === 'light' || stored === 'dark') return stored;
+      // Default to 'dark' to match production. Reset 'light' to 'dark' if found.
+      if (stored === 'light') {
+        window.localStorage.setItem('evil-atlas-theme', 'dark');
+        return 'dark';
+      }
+      if (stored === 'dark') return 'dark';
     }
     return 'dark';
   });
@@ -973,7 +978,7 @@ function App() {
        } else if (err?.message?.includes('API Key')) {
          setError("API configuration error. Please check your Gemini API key.");
        } else {
-       setError("Connection to The Villain's Atlas Archives failed.");
+       setError("Connection to AN Atlas Archives failed.");
        }
     } finally {
       setLoading(false);
@@ -1571,7 +1576,7 @@ function App() {
           }
         }
       `}</style>
-      <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`} role="application" aria-label="The A Atlas - Architecture finder">
+      <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`} role="application" aria-label="AN Atlas - Architecture finder">
       
       {/* Search Bar - Floating */}
       <SearchPanel 
@@ -1683,10 +1688,10 @@ function App() {
                  />
                </div>
                <h1 className={`${fontFamily.heading} text-[#FDFEFF] mb-8 pt-2 pb-2 max-[530px]:mb-6`} style={{ lineHeight: '0.9' }}>
-                 <div className="modal-title-line1" style={{ fontSize: '96px' }}>
-                   <span className="modal-title-A font-bold" style={{ fontSize: '120px' }}>A</span> <span className="modal-title-isfor" style={{ fontSize: '24px', marginLeft: '-12px' }}>is for</span>
+                 <div className="modal-title-line1" style={{ fontSize: '7vw' }}>
+                   <span className="modal-title-AN font-bold" style={{ fontSize: '7vw' }}>AN</span>
                  </div>
-                 <div className="modal-title-line2" style={{ fontSize: '96px' }}>Atlas</div>
+                 <div className="modal-title-line2" style={{ fontSize: '7vw' }}>Atlas</div>
                </h1>
              
              <div className={`space-y-4 ${typography.body.default} text-[#FDFEFF] mb-10 max-[530px]:mb-8`}>
@@ -1705,7 +1710,7 @@ function App() {
           </div>
           
           {/* Tracking status - below modal, side by side */}
-          <div className="absolute top-[calc(50%+280px)] left-1/2 transform -translate-x-1/2 flex items-center gap-8 z-30 max-[530px]:flex-col max-[530px]:gap-4 max-[530px]:w-full max-[530px]:px-4 max-[530px]:bottom-20 max-[530px]:top-auto max-[530px]:left-0 max-[530px]:transform-none">
+          <div className="absolute top-[calc(50%+280px)] left-1/2 transform -translate-x-1/2 flex items-center gap-8 z-30 max-[530px]:flex-col max-[530px]:gap-4 max-[530px]:w-full max-[530px]:px-4 max-[530px]:bottom-20 max-[530px]:top-auto max-[530px]:left-1/2 max-[530px]:transform max-[530px]:-translate-x-1/2 max-[530px]:justify-center">
             <div className={`flex items-center gap-2 ${typography.body.sm} text-[#BAB2CF] max-[530px]:w-full max-[530px]:justify-center`}>
               <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
               <span>Architecture tracking active</span>

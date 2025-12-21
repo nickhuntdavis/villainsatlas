@@ -51,8 +51,8 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else if (variant === 'nick') {
-    // Nick heart icon with subtle glow
-    size = isSelected ? 32 : 24;
+    // Nick heart icon with subtle glow - bigger size
+    size = isSelected ? 40 : 36;
     animationClass = 'nick-glow';
     const nickColor = '#FF5D88';
     const nickGlowColor = hexToRgba(nickColor, 0.3);
@@ -72,8 +72,8 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
-    // Red heart icon with red glow (similar to isPrioritized but with heart icon)
-    size = isSelected ? 42 : 32;
+    // Red heart icon with red glow (similar to isPrioritized but with heart icon) - smaller size for disgusting pins
+    size = isSelected ? 32 : 24;
     animationClass = 'red-heart-glow';
     const redColor = '#FF5D88'; // Same red as Nick's heart
     const redGlowColor = hexToRgba(redColor, 0.4);

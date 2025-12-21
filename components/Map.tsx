@@ -108,16 +108,14 @@ const LCPOptimizer: React.FC = () => {
           if (!tile.complete && tile.src) {
             tile.loading = 'eager' as any;
           }
-          // Set background color for unloaded tiles
-          if (!tile.complete || !tile.src) {
-            tile.style.backgroundColor = '#020B21';
-          }
+          // Remove any background colors - pane should be transparent
+          tile.style.backgroundColor = 'transparent';
         });
         
-        // Also set background on tile containers
+        // Remove background colors from tile containers - pane should be transparent
         const tileContainers = tileContainer.querySelectorAll('.leaflet-tile-container');
         tileContainers.forEach((container) => {
-          (container as HTMLElement).style.backgroundColor = '#020B21';
+          (container as HTMLElement).style.backgroundColor = 'transparent';
         });
       }
     };
