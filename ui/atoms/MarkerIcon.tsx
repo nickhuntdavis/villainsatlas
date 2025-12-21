@@ -72,26 +72,9 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
-    // Red heart icon with red glow (similar to isPrioritized but with heart icon) - smaller size for disgusting pins
-    size = isSelected ? 32 : 24;
-    animationClass = 'red-heart-glow';
-    const redColor = '#FF5D88'; // Same red as Nick's heart
-    const redGlowColor = hexToRgba(redColor, 0.4);
-    glowStyle = `
-      <style>
-        @keyframes redHeartGlow {
-          0%, 100% {
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 4px ${redGlowColor}) drop-shadow(0 0 8px ${redGlowColor});
-          }
-          50% {
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 6px ${redGlowColor}) drop-shadow(0 0 12px ${redGlowColor});
-          }
-        }
-        .red-heart-glow {
-          animation: redHeartGlow 2s ease-in-out infinite;
-        }
-      </style>
-    `;
+    // Red heart icon - smaller size for disgusting pins, no glow
+    size = isSelected ? 28 : 20;
+    // No animation or glow for disgusting pins
   } else if (isPrioritized) {
     // Prioritized buildings get subtle glow and are bigger (no bounce)
     // 150% bigger: 28px -> 42px, 36px -> 54px
@@ -139,11 +122,10 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </div>
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
-    // Red heart icon with red glow
+    // Red heart icon - no glow for disgusting pins
     const heartColor = '#FF5D88'; // Same red as Nick's heart
     html = `
-      ${glowStyle}
-      <div class="${animationClass}" style="
+      <div style="
         width: ${size}px;
         height: ${size}px;
         display: flex;

@@ -73,12 +73,12 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
 
   return (
     <aside
-      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(85dvh-6rem)] md:max-h-full overflow-y-auto custom-scrollbar bg-[#020716]"
+      className="absolute bottom-0 left-0 w-full md:w-96 md:top-0 md:left-0 md:h-full md:border-t-0 p-0 z-20 flex flex-col transition-all duration-300 ease-in-out h-auto max-h-[calc(100dvh-6rem-40px-1.5rem)] md:max-h-full overflow-y-auto bg-[#020716]"
       aria-label="Building details"
     >
       
-      {/* Image Header */}
-      <div className="relative w-full overflow-hidden shrink-0 bg-[#020716]">
+      {/* Image Header - edge to edge, no padding */}
+      <div className="relative w-full overflow-hidden shrink-0 bg-[#020716] m-0 p-0">
         {images.length > 0 ? (
           <ImageGallery images={images} buildingName={building.name} />
         ) : null}
@@ -99,13 +99,15 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                 return `rgba(${r}, ${g}, ${b}, ${opacity})`;
               };
               const tagColor = hexToRgba(tagColorHex, 0.2);
+              // Display "Love 🤢" instead of "Disgusting"
+              const displayText = style === 'Disgusting' ? 'Love 🤢' : style;
               return (
                 <div
                   key={index}
                   className="rounded-[4px] px-3 py-1.5 inline-block"
                   style={{ backgroundColor: tagColor }}
                 >
-                  <span className="text-white text-sm font-medium">{style}</span>
+                  <span className="text-white text-sm font-medium">{displayText}</span>
                 </div>
               );
             })}

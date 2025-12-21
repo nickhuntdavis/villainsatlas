@@ -101,19 +101,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
     const naturalHeight = img.naturalHeight;
     
     // Calculate rendered height based on image aspect ratio and container width
-    let renderedHeight: number;
-    if (naturalWidth > containerWidth) {
-      // Image is wider than container - scale down proportionally
-      renderedHeight = (naturalHeight / naturalWidth) * containerWidth;
-    } else {
-      // Image fits within container width - use natural height
-      renderedHeight = naturalHeight;
-    }
+    // For object-cover, we want the container to match the image aspect ratio
+    const aspectRatio = naturalHeight / naturalWidth;
+    const renderedHeight = containerWidth * aspectRatio;
     
     // Apply constraints: min 200px, max 512px
-    renderedHeight = Math.max(200, Math.min(renderedHeight, 512));
+    const constrainedHeight = Math.max(200, Math.min(renderedHeight, 512));
     
-    setContainerHeight(renderedHeight);
+    setContainerHeight(constrainedHeight);
   }, [containerHeight]);
 
   // Update height when current image changes
@@ -150,7 +145,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
       {/* Images container - dynamic height based on current image aspect ratio */}
       <div 
         ref={containerRef}
-        className="relative w-full flex items-center justify-center transition-all duration-500"
+        className="relative w-full transition-all duration-500"
         style={{ 
           height: containerHeight ? `${containerHeight}px` : '400px',
           minHeight: '200px',
@@ -160,7 +155,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
         {images.map((imageUrl, index) => (
           <div
             key={index}
-            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ${
+            className={`absolute inset-0 transition-opacity duration-500 ${
               index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
             }`}
           >
@@ -176,7 +171,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
               }}
               src={imageUrl}
               alt={`${buildingName} - Image ${index + 1}`}
-              className="max-w-full max-h-full w-auto h-auto object-contain"
+              className="w-full h-full object-cover"
               onLoad={(e) => {
                 const img = e.currentTarget;
                 handleImageLoad(index, img);

@@ -42,3 +42,12 @@ img.leaflet-tile:not([src]),
   background-image: none !important;
 }
 
+/* Hide scrollbar in sidepanel/bottomsheet */
+.overflow-y-auto::-webkit-scrollbar {
+  display: none;
+}
+.overflow-y-auto {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
