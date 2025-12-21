@@ -122,9 +122,10 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     ? `${row.city}, ${row.country}` 
     : row.city || row.country || "Unknown Location");
 
-  // Use is_prioritized from Baserow - only trust explicit value, don't derive
+  // Use is_prioritized from Baserow - only trust explicit boolean true value
   // This ensures only buildings explicitly marked as prioritized get the special styling
-  const isPrioritized = row.is_prioritized === true;
+  // Reject any truthy values that aren't exactly boolean true (handles strings, numbers, etc.)
+  const isPrioritized = row.is_prioritized === true && typeof row.is_prioritized === 'boolean';
 
   // Check for purple heart buildings - either from Baserow field or by name
   const purpleHeartBuildings = [

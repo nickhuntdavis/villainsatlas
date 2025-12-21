@@ -39,8 +39,8 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
       return;
     }
     
-    // Trigger hearts animation on single click for Nick pin
-    if (isNick && onTripleClick) {
+    // Trigger hearts animation on single click for Nick pin or Palace of Culture
+    if ((isNick || isPalaceOfCulture) && onTripleClick) {
       onTripleClick();
     }
     
