@@ -103,10 +103,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   return (
     <div className={`absolute top-6 left-6 right-6 z-10 flex flex-col gap-3 pointer-events-none transition-all duration-300 ${
       isSidebarOpen 
-        ? 'md:left-[calc(24rem+1.5rem)] md:right-[3.25rem] md:w-auto md:flex md:items-center' 
+        ? 'md:left-[calc(24rem+1.5rem)] md:right-6 md:flex md:items-center md:justify-center' 
         : 'md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto'
     }`}>
-      <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`} role="search" aria-label="Search for buildings">
+      <form onSubmit={handleSubmit} className="relative group pointer-events-auto w-full md:max-w-[480px]" role="search" aria-label="Search for buildings">
         <div 
           className="relative flex items-center justify-between bg-[#282C55] rounded-[10px] pl-4 pr-2 transition-all"
           style={{ 

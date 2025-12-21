@@ -172,6 +172,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
               src={imageUrl}
               alt={`${buildingName} - Image ${index + 1}`}
               className="w-full h-full object-cover"
+              loading={index === 0 ? "eager" : "lazy"}
+              decoding="async"
               onLoad={(e) => {
                 const img = e.currentTarget;
                 handleImageLoad(index, img);

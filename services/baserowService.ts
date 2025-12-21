@@ -1,4 +1,5 @@
 import { Building, Coordinates } from "../types";
+import { optimizeImage } from "../utils/imageOptimizer";
 
 const BASEROW_API_BASE = "https://api.baserow.io/api/database/rows/table";
 const TABLE_ID = process.env.REACT_APP_BASEROW_TABLE_ID || "772747";
@@ -83,8 +84,24 @@ const extractUrlFromMarkdown = (urlString: string | undefined): string | undefin
 // Upload a file to Baserow and return the file object
 export const uploadFileToBaserow = async (file: File): Promise<BaserowFileField> => {
   try {
+    // Optimize image before upload (only for image files)
+    let fileToUpload = file;
+    if (file.type.startsWith('image/')) {
+      try {
+        fileToUpload = await optimizeImage(file, {
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 0.85,
+          format: 'jpeg', // Convert to JPEG for better compression
+        });
+      } catch (optimizationError) {
+        console.warn(`Failed to optimize image "${file.name}", uploading original:`, optimizationError);
+        // Continue with original file if optimization fails
+      }
+    }
+    
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', fileToUpload);
     
     // Baserow file upload endpoint
     const uploadUrl = 'https://api.baserow.io/api/user-files/upload-file/';
@@ -106,10 +123,10 @@ export const uploadFileToBaserow = async (file: File): Promise<BaserowFileField>
     
     // Baserow returns file object with name, url, size, mime_type
     return {
-      name: data.name || file.name,
+      name: data.name || fileToUpload.name,
       url: data.url || data.thumbnails?.url || data.original || '',
-      size: data.size || file.size,
-      mime_type: data.mime_type || file.type,
+      size: data.size || fileToUpload.size,
+      mime_type: data.mime_type || fileToUpload.type,
     };
   } catch (error) {
     console.error('Error uploading file to Baserow:', error);

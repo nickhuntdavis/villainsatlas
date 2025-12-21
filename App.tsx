@@ -1204,21 +1204,38 @@ function App() {
       setLoading(true);
       
       if (editingBuilding) {
-        // Update existing building
+        // Check if building has a Baserow ID
         const rowIdMatch = editingBuilding.id.match(/^baserow-(\d+)$/);
-        if (!rowIdMatch) {
-          throw new Error('Cannot update non-Baserow building');
+        
+        if (rowIdMatch) {
+          // Update existing Baserow building
+          const rowId = parseInt(rowIdMatch[1], 10);
+          const updatedBuilding = await updateBuildingInBaserow(rowId, buildingData, imageFiles);
+          
+          // Update local state
+          setBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
+          setAllBaserowBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
+          
+          setStatusMessage(`Updated "${updatedBuilding.name}"`);
+          console.log(`✅ Updated building "${updatedBuilding.name}" in Baserow`);
+        } else {
+          // Building doesn't have Baserow ID yet (e.g., from Gemini search)
+          // Save it to Baserow first, then update local state with the new Baserow ID
+          const savedBuilding = await saveBuildingToBaserow(buildingData, imageFiles);
+          
+          // Remove old building and add new one with Baserow ID
+          setBuildings(prev => {
+            const filtered = prev.filter(b => b.id !== editingBuilding.id);
+            return mergeBuildings(filtered, [savedBuilding]);
+          });
+          setAllBaserowBuildings(prev => {
+            const filtered = prev.filter(b => b.id !== editingBuilding.id);
+            return mergeBuildings(filtered, [savedBuilding]);
+          });
+          
+          setStatusMessage(`Saved "${savedBuilding.name}" to database`);
+          console.log(`✅ Saved building "${savedBuilding.name}" to Baserow (was previously unsaved)`);
         }
-        
-        const rowId = parseInt(rowIdMatch[1], 10);
-        const updatedBuilding = await updateBuildingInBaserow(rowId, buildingData, imageFiles);
-        
-        // Update local state
-        setBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
-        setAllBaserowBuildings(prev => prev.map(b => b.id === editingBuilding.id ? updatedBuilding : b));
-        
-        setStatusMessage(`Updated "${updatedBuilding.name}"`);
-        console.log(`✅ Updated building "${updatedBuilding.name}" in Baserow`);
       } else {
         // Create new building
         const savedBuilding = await saveBuildingToBaserow(buildingData, imageFiles);
@@ -1893,30 +1910,44 @@ function App() {
               
               // Extract Baserow row ID from building.id (format: "baserow-{id}")
               const rowIdMatch = building.id.match(/^baserow-(\d+)$/);
-              if (!rowIdMatch) {
-                console.error(`Cannot delete building "${building.name}": Invalid ID format`);
-                setError(`Cannot delete building: Invalid ID format`);
-                return;
-              }
               
-              const rowId = parseInt(rowIdMatch[1], 10);
-              
-              try {
-                // Hide building in Baserow
-                await hideBuildingInBaserow(rowId);
-                console.log(`✅ Hidden building "${building.name}" in Baserow`);
+              if (rowIdMatch) {
+                // Building exists in Baserow - hide it there
+                const rowId = parseInt(rowIdMatch[1], 10);
                 
-                // Remove building from local state
-                setBuildings((prev) => prev.filter(b => b.id !== building.id));
-                
-                // Close the building details panel
-                setSelectedBuilding(null);
-                
-                // Show success message
-                setStatusMessage(`Removed "${building.name}" from the map`);
-              } catch (err) {
-                console.error(`Failed to hide building "${building.name}":`, err);
-                setError(`Failed to remove "${building.name}"`);
+                try {
+                  // Hide building in Baserow
+                  await hideBuildingInBaserow(rowId);
+                  console.log(`✅ Hidden building "${building.name}" in Baserow`);
+                  
+                  // Remove building from local state
+                  setBuildings((prev) => prev.filter(b => b.id !== building.id));
+                  
+                  // Close the building details panel
+                  setSelectedBuilding(null);
+                  
+                  // Show success message
+                  setStatusMessage(`Removed "${building.name}" from the map`);
+                } catch (err) {
+                  console.error(`Failed to hide building "${building.name}":`, err);
+                  setError(`Failed to remove "${building.name}"`);
+                }
+              } else {
+                // Building doesn't have Baserow ID (e.g., from Gemini search, not saved yet)
+                // Just remove it from local state
+                try {
+                  setBuildings((prev) => prev.filter(b => b.id !== building.id));
+                  
+                  // Close the building details panel
+                  setSelectedBuilding(null);
+                  
+                  // Show success message
+                  setStatusMessage(`Removed "${building.name}" from the map`);
+                  console.log(`✅ Removed unsaved building "${building.name}" from local state`);
+                } catch (err) {
+                  console.error(`Failed to remove building "${building.name}":`, err);
+                  setError(`Failed to remove "${building.name}"`);
+                }
               }
             }}
             onCancel={() => {
