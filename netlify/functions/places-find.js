@@ -1,8 +1,11 @@
 // Netlify serverless function for Google Places API - Find Place from Text
 export const handler = async (event, context) => {
+  // Get allowed origin from environment or default to wildcard (should be restricted in production)
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+  
   // Handle CORS
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Content-Type': 'application/json',
@@ -42,6 +45,7 @@ export const handler = async (event, context) => {
   // Get query parameters
   const { input, inputtype, fields } = event.queryStringParameters || {};
 
+  // Input validation
   if (!input) {
     return {
       statusCode: 400,
@@ -50,9 +54,37 @@ export const handler = async (event, context) => {
     };
   }
 
+  // Validate input length and characters (prevent abuse)
+  if (typeof input !== 'string' || input.length > 500) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid input: must be a string with max 500 characters' }),
+    };
+  }
+
+  // Validate inputtype if provided
+  const validInputTypes = ['textquery', 'phonenumber'];
+  const inputtypeParam = inputtype || 'textquery';
+  if (inputtype && !validInputTypes.includes(inputtype)) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: `Invalid inputtype: must be one of ${validInputTypes.join(', ')}` }),
+    };
+  }
+
+  // Validate fields parameter (basic check)
+  const fieldsParam = fields || 'place_id';
+  if (fields && typeof fields !== 'string' || (fields && fields.length > 500)) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid fields parameter' }),
+    };
+  }
+
   try {
-    const inputtypeParam = inputtype || 'textquery';
-    const fieldsParam = fields || 'place_id';
     const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=${inputtypeParam}&fields=${encodeURIComponent(fieldsParam)}&key=${apiKey}`;
     
     const response = await fetch(url);

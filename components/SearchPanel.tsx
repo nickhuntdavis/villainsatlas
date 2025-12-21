@@ -1,32 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Locate, Crosshair, Binoculars } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { SurfaceCard, StatusStrip } from '../ui/atoms';
 import { typography, getThemeColors } from '../ui/theme';
 
 interface SearchPanelProps {
   onSearch: (query: string) => void;
-  onLocateMe: () => void;
-  onFindNearest: () => void;
-  onSearchArea: () => void;
   isLoading: boolean;
   searchStatus: 'idle' | 'searching_baserow' | 'searching_gemini';
   statusMessage?: string | null;
   theme: 'dark' | 'light';
   isSidebarOpen?: boolean;
-  locationPermissionDenied?: boolean;
 }
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({
   onSearch,
-  onLocateMe,
-  onFindNearest,
-  onSearchArea,
   isLoading,
   searchStatus,
   statusMessage,
   theme,
   isSidebarOpen = false,
-  locationPermissionDenied = false,
 }) => {
   const [query, setQuery] = useState('');
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
@@ -115,78 +107,43 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         : 'md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-auto'
     }`}>
       <form onSubmit={handleSubmit} className={`relative group pointer-events-auto ${isSidebarOpen ? 'md:mx-auto md:w-full md:max-w-full' : 'md:w-full'}`} role="search" aria-label="Search for buildings">
-        <div className={`relative flex items-center bg-[#282C55] rounded-[16px] pt-3 pb-3 pl-3 overflow-hidden transition-all ${!isSidebarOpen ? 'md:min-w-[720px]' : ''}`} style={{ filter: 'drop-shadow(0 6px 18px #020716)', paddingRight: '24px' }}>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-[#AA8BFF] text-[#010E36] px-3 py-2 rounded-[4px] flex items-center justify-center transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ fontSize: '20px' }}
-            aria-label={isLoading ? "Searching..." : "Search"}
-          >
-            {isLoading ? (
-              <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Search size={18} strokeWidth={2.5} aria-hidden="true" />
-            )}
-          </button>
-          
+        <div 
+          className="relative flex items-center justify-between bg-[#282C55] rounded-[10px] pl-4 pr-2 transition-all"
+          style={{ 
+            boxShadow: '0px 1px 29px 0px rgba(1,10,36,0.3)',
+            height: '48px',
+            width: '480px',
+            maxWidth: '100%'
+          }}
+        >
           <label htmlFor="search-input" className="sr-only">Search for buildings</label>
           <input
             id="search-input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search"
-            className="flex-1 bg-transparent border-none px-3 py-0 text-white focus:outline-none min-w-0 placeholder:text-white"
+            placeholder="Search any place..."
+            className="flex-1 bg-transparent border-none text-white focus:outline-none min-w-0 placeholder:text-white"
             disabled={isLoading}
-            style={{ fontSize: '16px' }}
+            style={{ 
+              fontSize: '16px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 500
+            }}
             aria-label="Search for buildings"
           />
           
           <button
-            type="button"
-            onClick={onLocateMe}
-            disabled={locationPermissionDenied && !navigator.geolocation}
-            className={`flex items-center gap-2 px-0 py-0 transition-colors ml-6 ${
-              locationPermissionDenied && navigator.geolocation
-                ? 'text-[#CDBAFF]/40 opacity-50 cursor-not-allowed'
-                : 'text-[#CDBAFF] hover:opacity-80'
-            }`}
-            title={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to my location"}
-            aria-label={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to my location"}
-            style={{ fontSize: '16px' }}
+            type="submit"
+            disabled={isLoading}
+            className="flex items-center justify-center p-3 rounded-[10px] transition-all hover:opacity-90 disabled:opacity-50"
+            aria-label={isLoading ? "Searching..." : "Search"}
           >
-            <Locate size={16} className={locationPermissionDenied && navigator.geolocation ? "text-[#CDBAFF]/40" : "text-[#CDBAFF]"} aria-hidden="true" />
-            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Me</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={onFindNearest}
-            disabled={locationPermissionDenied && !navigator.geolocation}
-            className={`flex items-center gap-2 px-0 py-0 transition-colors ml-6 ${
-              locationPermissionDenied && navigator.geolocation
-                ? 'text-[#CDBAFF]/40 opacity-50 cursor-not-allowed'
-                : 'text-[#CDBAFF] hover:opacity-80'
-            }`}
-            title={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to nearest building"}
-            aria-label={locationPermissionDenied && navigator.geolocation ? "Location access denied. Click to try again." : "Jump to nearest building"}
-            style={{ fontSize: '16px' }}
-          >
-            <Crosshair size={16} className={locationPermissionDenied && navigator.geolocation ? "text-[#CDBAFF]/40" : "text-[#CDBAFF]"} aria-hidden="true" />
-            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Nearest</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onSearchArea}
-            className="flex items-center gap-2 px-0 py-0 transition-colors text-[#CDBAFF] ml-6"
-            title="Scan current area"
-            aria-label="Scan current area"
-            style={{ fontSize: '16px' }}
-          >
-            <Binoculars size={16} className="text-[#CDBAFF]" aria-hidden="true" />
-            <span className="hidden lg:inline uppercase" style={{ fontSize: '12px' }} aria-hidden="true">Scan here</span>
+            {isLoading ? (
+              <Loader2 size={20} className="animate-spin text-white" aria-hidden="true" />
+            ) : (
+              <Search size={20} className="text-white" strokeWidth={2.5} aria-hidden="true" />
+            )}
           </button>
         </div>
       </form>

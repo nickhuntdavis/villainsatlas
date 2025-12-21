@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { Map as AtlasMap } from './components/Map';
 import { SearchPanel } from './components/SearchPanel';
+import { SearchFABs } from './components/SearchFABs';
 // Lazy load non-critical components for code splitting
 const BuildingDetails = lazy(() => 
   import('./components/BuildingDetails').then(module => ({ default: module.BuildingDetails }))
@@ -1539,40 +1540,42 @@ function App() {
         }
         .dedupe-button {
           bottom: calc(1rem + 16px) !important;
+          right: calc(1rem + 100px) !important;
         }
         @media (min-width: 768px) {
           .dedupe-button {
             bottom: calc(1.5rem + 16px) !important;
+            right: calc(1.5rem + 100px) !important;
           }
         }
         .backfill-button {
           bottom: calc(1rem + 16px) !important;
-          right: calc(1rem + 12px + 4px + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) + force gemini button width (12px) + gap (4px) */
+          right: calc(1rem + 12px + 4px + 12px + 4px + 100px) !important; /* dedupe button width (12px) + gap (4px) + force gemini button width (12px) + gap (4px) + 100px offset */
         }
         @media (min-width: 768px) {
           .backfill-button {
             bottom: calc(1.5rem + 16px) !important;
-            right: calc(1.5rem + 12px + 4px + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) + force gemini button width (12px) + gap (4px) */
+            right: calc(1.5rem + 12px + 4px + 12px + 4px + 100px) !important; /* dedupe button width (12px) + gap (4px) + force gemini button width (12px) + gap (4px) + 100px offset */
           }
         }
         .force-gemini-button {
           bottom: calc(1rem + 16px) !important;
-          right: calc(1rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
+          right: calc(1rem + 12px + 4px + 100px) !important; /* dedupe button width (12px) + gap (4px) + 100px offset */
         }
         @media (min-width: 768px) {
           .force-gemini-button {
             bottom: calc(1.5rem + 16px) !important;
-            right: calc(1.5rem + 12px + 4px) !important; /* dedupe button width (12px) + gap (4px) */
+            right: calc(1.5rem + 12px + 4px + 100px) !important; /* dedupe button width (12px) + gap (4px) + 100px offset */
           }
         }
         .admin-toggle-button {
           bottom: calc(1rem + 16px) !important;
-          right: calc(1rem + 12px + 4px + 12px + 4px + 12px + 4px) !important; /* force gemini (12px) + gap (4px) + backfill (12px) + gap (4px) + dedupe (12px) + gap (4px) */
+          right: calc(1rem + 12px + 4px + 12px + 4px + 12px + 4px + 100px) !important; /* force gemini (12px) + gap (4px) + backfill (12px) + gap (4px) + dedupe (12px) + gap (4px) + 100px offset */
         }
         @media (min-width: 768px) {
           .admin-toggle-button {
             bottom: calc(1.5rem + 16px) !important;
-            right: calc(1.5rem + 12px + 4px + 12px + 4px + 12px + 4px) !important; /* force gemini (12px) + gap (4px) + backfill (12px) + gap (4px) + dedupe (12px) + gap (4px) */
+            right: calc(1.5rem + 12px + 4px + 12px + 4px + 12px + 4px + 100px) !important; /* force gemini (12px) + gap (4px) + backfill (12px) + gap (4px) + dedupe (12px) + gap (4px) + 100px offset */
           }
         }
       `}</style>
@@ -1581,14 +1584,18 @@ function App() {
       {/* Search Bar - Floating */}
       <SearchPanel 
         onSearch={handleSearch} 
-        onLocateMe={handleLocateMe}
-        onFindNearest={handleFindNearest}
-        onSearchArea={handleSearchArea}
         isLoading={loading}
         searchStatus={searchStatus}
         statusMessage={statusMessage}
         theme={theme}
         isSidebarOpen={!!selectedBuilding}
+      />
+
+      {/* Search FABs - Bottom Right */}
+      <SearchFABs
+        onLocateMe={handleLocateMe}
+        onFindNearest={handleFindNearest}
+        onSearchArea={handleSearchArea}
         locationPermissionDenied={locationPermissionDenied}
       />
 
@@ -1806,11 +1813,11 @@ function App() {
         </button>
       )}
 
-      {/* Subtle dedupe button - bottom right */}
+      {/* Subtle dedupe button - bottom right (moved 100px left) */}
       {buttonsVisible && (
         <button
           onClick={handleDedupeButtonClick}
-          className="absolute right-4 md:right-6 z-10 cursor-pointer transition-opacity hover:opacity-20 dedupe-button"
+          className="absolute z-10 cursor-pointer transition-opacity hover:opacity-20 dedupe-button"
           style={{ 
             width: '12px', 
             height: '12px', 

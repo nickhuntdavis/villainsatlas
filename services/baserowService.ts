@@ -2,7 +2,12 @@ import { Building, Coordinates } from "../types";
 
 const BASEROW_API_BASE = "https://api.baserow.io/api/database/rows/table";
 const TABLE_ID = process.env.REACT_APP_BASEROW_TABLE_ID || "772747";
-const API_TOKEN = process.env.REACT_APP_BASEROW_API_TOKEN || "FhAvq74hSan4hSyyYB012Vp5eQmoOaGR";
+const API_TOKEN = process.env.REACT_APP_BASEROW_API_TOKEN;
+
+if (!API_TOKEN) {
+  console.error("CRITICAL: REACT_APP_BASEROW_API_TOKEN environment variable is required");
+  throw new Error("Baserow API token is not configured. Please set REACT_APP_BASEROW_API_TOKEN environment variable.");
+}
 
 // Helper to calculate distance in meters (Haversine formula)
 const getDistance = (coord1: Coordinates, coord2: Coordinates): number => {

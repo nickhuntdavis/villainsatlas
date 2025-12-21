@@ -1,8 +1,11 @@
 // Netlify serverless function for Google Places API - Place Details
 export const handler = async (event, context) => {
+  // Get allowed origin from environment or default to wildcard (should be restricted in production)
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+  
   // Handle CORS
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Content-Type': 'application/json',
@@ -42,6 +45,7 @@ export const handler = async (event, context) => {
   // Get query parameters
   const { place_id, fields } = event.queryStringParameters || {};
 
+  // Input validation
   if (!place_id) {
     return {
       statusCode: 400,
@@ -50,8 +54,26 @@ export const handler = async (event, context) => {
     };
   }
 
+  // Validate place_id format (Google Place IDs are typically alphanumeric with some special chars)
+  if (typeof place_id !== 'string' || place_id.length > 200 || !/^[a-zA-Z0-9_\-+]+$/.test(place_id)) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid place_id format' }),
+    };
+  }
+
+  // Validate fields parameter
+  const fieldsParam = fields || 'photos';
+  if (fields && (typeof fields !== 'string' || fields.length > 500)) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid fields parameter' }),
+    };
+  }
+
   try {
-    const fieldsParam = fields || 'photos';
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=${encodeURIComponent(fieldsParam)}&key=${apiKey}`;
     
     const response = await fetch(url);

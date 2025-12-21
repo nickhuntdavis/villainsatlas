@@ -34,8 +34,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // Geocode a location name to coordinates using Gemini
 export const geocodeLocation = async (locationName: string): Promise<Coordinates | null> => {
   if (!process.env.API_KEY) {
-    console.error("API Key is missing for geocoding");
-    return null;
+    console.error("CRITICAL: API Key is missing for geocoding");
+    throw new Error("Gemini API key is not configured. Please set VITE_GEMINI_API_KEY environment variable.");
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -814,8 +814,8 @@ const extractJsonObject = (str: string): string => {
 // Check with Gemini if a POI matches the style criteria
 export const checkPOIStyleCriteria = async (building: Building): Promise<{ matches: boolean; building?: Building }> => {
   if (!process.env.API_KEY) {
-    console.error("API Key is missing");
-    return { matches: false };
+    console.error("CRITICAL: API Key is missing");
+    throw new Error("Gemini API key is not configured. Please set VITE_GEMINI_API_KEY environment variable.");
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });

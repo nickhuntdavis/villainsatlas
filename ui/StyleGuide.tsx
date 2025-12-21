@@ -72,6 +72,10 @@ export const StyleGuide: React.FC = () => {
     return (
       <div className="flex flex-col items-center gap-1">
         {html ? (
+          // SECURITY NOTE: dangerouslySetInnerHTML is safe here because:
+          // 1. This is an internal dev tool (StyleGuide) only
+          // 2. HTML comes from createMarkerIcon() which is a controlled, trusted source
+          // 3. No user input is involved in generating this HTML
           <div
             className="w-10 h-10 flex items-center justify-center"
             dangerouslySetInnerHTML={{ __html: html }}
