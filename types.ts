@@ -64,6 +64,7 @@ export interface Building {
   architect?: string; // Name of architect if well-known
   hasPurpleHeart?: boolean; // True for special romantic locations that get purple glowing hearts
   source?: string; // Source of building entry (e.g., 'manual' for manually added)
+  favourites?: boolean; // True if building is marked as a favourite
 }
 
 export interface MapViewState {

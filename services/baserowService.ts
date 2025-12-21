@@ -50,6 +50,7 @@ interface BaserowRow {
   is_hidden?: boolean; // Whether building is hidden (soft-deleted)
   is_purple_heart?: boolean; // Whether building should have a purple glowing heart
   source?: string; // Source of building entry (e.g., 'manual')
+  favourites?: boolean; // Whether building is marked as a favourite
 }
 
 // Extended Building interface for saving (includes Baserow-specific fields)
@@ -193,6 +194,7 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     architect: row.architect || undefined,
     hasPurpleHeart: !!hasPurpleHeart,
     source: row.source || undefined,
+    favourites: row.favourites || false,
   };
 };
 
@@ -541,6 +543,31 @@ export const hideBuildingInBaserow = async (rowId: number): Promise<void> => {
     }
   } catch (error) {
     console.error("Error hiding building in Baserow:", error);
+    throw error;
+  }
+};
+
+// Toggle favourites status for a building in Baserow
+export const toggleFavouriteInBaserow = async (rowId: number, isFavourite: boolean): Promise<void> => {
+  try {
+    const response = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ favourites: isFavourite }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Baserow API error: ${response.status} - ${errorText}`);
+    }
+  } catch (error) {
+    console.error("Error toggling favourite in Baserow:", error);
     throw error;
   }
 };

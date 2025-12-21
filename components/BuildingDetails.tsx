@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building, Coordinates } from '../types';
-import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown } from 'lucide-react';
+import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 import { ImageGallery } from './ImageGallery';
@@ -11,6 +11,7 @@ interface BuildingDetailsProps {
   theme: 'dark' | 'light';
   userLocation?: Coordinates | null;
   onDelete?: () => void;
+  onFavourite?: () => void;
 }
 
 // Helper function to extract URL from markdown link format [text](url) or just return URL if already plain
@@ -52,7 +53,7 @@ const formatDistance = (meters: number): string => {
   return `${(meters / 1000).toFixed(1)}km`;
 };
 
-export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete }) => {
+export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete, onFavourite }) => {
   const [imgError, setImgError] = useState(false);
 
   // Reset error state when building changes
@@ -230,17 +231,30 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                 <span className="opacity-70">Estimated distance: </span>
                 <span className="font-medium">{formatDistance(getDistance(userLocation, building.coordinates))}</span>
               </div>
-              {onDelete && (
-                <button
-                  onClick={onDelete}
-                  className="p-1.5 hover:opacity-80 transition-opacity"
-                  title="Remove this building"
-                  aria-label="Remove this building"
-                  style={{ color: '#11162F' }}
-                >
-                  <ThumbsDown size={16} strokeWidth={2} aria-hidden="true" />
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {onFavourite && (
+                  <button
+                    onClick={onFavourite}
+                    className="p-1.5 hover:opacity-80 transition-opacity"
+                    title={building.favourites ? "Remove from favourites" : "Add to favourites"}
+                    aria-label={building.favourites ? "Remove from favourites" : "Add to favourites"}
+                    style={{ color: building.favourites ? '#FFD700' : '#11162F' }}
+                  >
+                    <Bookmark size={16} strokeWidth={2} fill={building.favourites ? 'currentColor' : 'none'} aria-hidden="true" />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={onDelete}
+                    className="p-1.5 hover:opacity-80 transition-opacity"
+                    title="Remove this building"
+                    aria-label="Remove this building"
+                    style={{ color: '#11162F' }}
+                  >
+                    <ThumbsDown size={16} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

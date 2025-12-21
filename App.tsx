@@ -20,7 +20,7 @@ const BuildingEditorModal = lazy(() =>
 import { AdminToggle } from './components/AdminToggle';
 import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding, isPOIQuery, searchPOIByName, checkPOIStyleCriteria } from './services/geminiService';
-import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow, hideBuildingInBaserow } from './services/baserowService';
+import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow, hideBuildingInBaserow, toggleFavouriteInBaserow } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan, X } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
@@ -1638,6 +1638,37 @@ function App() {
             onDelete={() => {
               if (selectedBuilding) {
                 setBuildingToDelete(selectedBuilding);
+              }
+            }}
+            onFavourite={async () => {
+              if (!selectedBuilding) return;
+              
+              // Extract Baserow row ID from building.id (format: "baserow-{id}")
+              const rowIdMatch = selectedBuilding.id.match(/^baserow-(\d+)$/);
+              if (!rowIdMatch) {
+                console.error(`Cannot toggle favourite for building "${selectedBuilding.name}": Invalid ID format`);
+                setError(`Cannot toggle favourite: Invalid ID format`);
+                return;
+              }
+              
+              const rowId = parseInt(rowIdMatch[1], 10);
+              const newFavouriteStatus = !selectedBuilding.favourites;
+              
+              try {
+                // Toggle favourite in Baserow
+                await toggleFavouriteInBaserow(rowId, newFavouriteStatus);
+                console.log(`✅ ${newFavouriteStatus ? 'Added' : 'Removed'} "${selectedBuilding.name}" ${newFavouriteStatus ? 'to' : 'from'} favourites`);
+                
+                // Update building in local state
+                const updatedBuilding = { ...selectedBuilding, favourites: newFavouriteStatus };
+                setSelectedBuilding(updatedBuilding);
+                setBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                
+                // Show success message
+                setStatusMessage(`${newFavouriteStatus ? 'Added' : 'Removed'} "${selectedBuilding.name}" ${newFavouriteStatus ? 'to' : 'from'} favourites`);
+              } catch (err) {
+                console.error(`Failed to toggle favourite for "${selectedBuilding.name}":`, err);
+                setError(`Failed to ${newFavouriteStatus ? 'add' : 'remove'} favourite`);
               }
             }}
           />
