@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, lazy, Suspense } from 
 import { Map as AtlasMap } from './components/Map';
 import { SearchPanel } from './components/SearchPanel';
 import { SearchFABs } from './components/SearchFABs';
+import LandingSequence from './components/LandingSequence';
 // Lazy load non-critical components for code splitting
 const BuildingDetails = lazy(() => 
   import('./components/BuildingDetails').then(module => ({ default: module.BuildingDetails }))
@@ -35,7 +36,8 @@ function App() {
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [firstLoad, setFirstLoad] = useState(true);
+  const [introState, setIntroState] = useState<'intro' | 'complete'>('intro');
+  const [firstLoad, setFirstLoad] = useState(true); // Keep for backward compatibility
   const [searchStatus, setSearchStatus] = useState<'idle' | 'searching_baserow' | 'searching_gemini'>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -100,6 +102,7 @@ function App() {
       window.localStorage.setItem('evil-atlas-theme', theme);
     }
   }, [theme]);
+
 
   // Keyboard handler for H key to toggle button visibility
   useEffect(() => {
@@ -488,7 +491,19 @@ function App() {
     return R * c;
   };
 
+  // Handler for intro sequence - immediately goes to map view
+  const handleStartScan = useCallback(() => {
+    setIntroState('complete');
+    setFirstLoad(false);
+  }, []);
+
   const handleLocateMe = useCallback(() => {
+    // If intro is still showing, complete it first
+    if (introState !== 'complete') {
+      setIntroState('complete');
+      setFirstLoad(false);
+    }
+
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
       return;
@@ -1598,8 +1613,53 @@ function App() {
       `}</style>
       <div className={`relative w-screen h-[100dvh] overflow-hidden flex flex-col ${colors.background.default}`} role="application" aria-label="AN Atlas - Architecture finder">
       
-      {/* Search Bar - Floating */}
-      <SearchPanel 
+      {/* Map Layer - Blurred during intro */}
+      <main className={`flex-1 relative z-0 transition-all duration-[2000ms] ${
+        introState === 'intro' 
+          ? 'blur-xl grayscale opacity-20 scale-125' 
+          : 'blur-0 grayscale-0 opacity-100 scale-100'
+      }`} aria-label="Map view">
+        <AtlasMap 
+          center={center}
+          buildings={buildings}
+          selectedBuilding={selectedBuilding}
+          onSelectBuilding={handleSelectBuilding}
+          onBoundsRequest={handleBoundsRequest}
+          theme={theme}
+          onNickTripleClick={handleNickTripleClick}
+          adminModeEnabled={adminModeEnabled}
+          onMapClick={handleMapClick}
+          onEditBuilding={handleEditBuilding}
+        />
+        {/* Map color overlay - only in dark mode */}
+        {theme === 'dark' && (
+          <>
+            <div 
+              className="absolute inset-0 pointer-events-none z-10"
+              style={{ 
+                backgroundColor: '#030919',
+                mixBlendMode: 'exclusion'
+              }}
+            />
+            <div 
+              className="absolute inset-0 pointer-events-none z-10"
+              style={{ 
+                backgroundColor: '#010E36',
+                opacity: 0.25
+              }}
+            />
+          </>
+        )}
+      </main>
+
+      {/* Landing Sequence - Full Screen Intro */}
+      {introState === 'intro' && (
+        <LandingSequence onInitialize={handleStartScan} />
+      )}
+      
+      {/* Search Bar - Floating - Only show after intro completes */}
+      {introState === 'complete' && (
+        <SearchPanel 
         onSearch={handleSearch} 
         isLoading={loading}
         searchStatus={searchStatus}
@@ -1636,50 +1696,16 @@ function App() {
             setBuildings((prev) => mergeBuildings(prev, [building]));
           }
         }}
-      />
-
-      {/* Search FABs - Bottom Right */}
-      <SearchFABs
-        onLocateMe={handleLocateMe}
-        onFindNearest={handleFindNearest}
-        onSearchArea={handleSearchArea}
-        locationPermissionDenied={locationPermissionDenied}
-      />
-
-      {/* Map Layer */}
-      <main className="flex-1 relative z-0" aria-label="Map view">
-        <AtlasMap 
-          center={center}
-          buildings={buildings}
-          selectedBuilding={selectedBuilding}
-          onSelectBuilding={handleSelectBuilding}
-          onBoundsRequest={handleBoundsRequest}
-          theme={theme}
-          onNickTripleClick={handleNickTripleClick}
-          adminModeEnabled={adminModeEnabled}
-          onMapClick={handleMapClick}
-          onEditBuilding={handleEditBuilding}
         />
-        {/* Map color overlay - only in dark mode */}
-        {theme === 'dark' && (
-          <>
-            <div 
-              className="absolute inset-0 pointer-events-none z-10"
-              style={{ 
-                backgroundColor: '#030919',
-                mixBlendMode: 'exclusion'
-              }}
-            />
-            <div 
-              className="absolute inset-0 pointer-events-none z-10"
-              style={{ 
-                backgroundColor: '#010E36',
-                opacity: 0.25
-              }}
-            />
-          </>
-        )}
-      </main>
+      )}
+      {introState === 'complete' && (
+        <SearchFABs
+          onLocateMe={handleLocateMe}
+          onFindNearest={handleFindNearest}
+          onSearchArea={handleSearchArea}
+          locationPermissionDenied={locationPermissionDenied}
+        />
+      )}
 
       {/* Detail Panel - Sliding Drawer */}
       {selectedBuilding && (
@@ -1729,85 +1755,19 @@ function App() {
         </Suspense>
       )}
 
-      {/* The "N" Button - Bottom Left */}
-      <button
-        onClick={handleNButton}
-        className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 transition-all flex items-center justify-center group hover:scale-105"
-        title="The Architect"
-        aria-label="The Architect"
-      >
-        <Heart size={20} className="group-hover:scale-110 transition-all fill-current" style={{ color: '#FF5D88' }} aria-hidden="true" />
-      </button>
-
-
-      {/* Intro / Empty State Overlay */}
-      {firstLoad && !loading && (
-        <>
-          <style>{`
-            @media (max-width: 530px) {
-              .modal-title-line1 { font-size: 60px !important; }
-              .modal-title-A { font-size: 72px !important; }
-              .modal-title-isfor { font-size: 18px !important; margin-left: -8px !important; }
-              .modal-title-line2 { font-size: 60px !important; }
-              .modal-palace-img { display: none !important; }
-            }
-          `}</style>
-          <div className="absolute inset-0 bg-[#010E36]/80 z-30 flex items-center justify-center p-8 overflow-visible">
-            <div className="max-w-lg w-auto bg-[#282C55] shadow-xl relative rounded-[32px] overflow-visible" style={{ padding: '48px' }}>
-               {/* Close button - top right */}
-               <button
-                 onClick={() => setFirstLoad(false)}
-                 className="absolute top-4 right-4 p-2 text-[#BAB2CF] hover:text-[#FDFEFF] transition-colors opacity-60 hover:opacity-100"
-                 aria-label="Close modal"
-                 title="Close"
-               >
-                 <X size={18} strokeWidth={2} aria-hidden="true" />
-               </button>
-               
-               <div className="absolute right-12 top-[6.2rem] max-[530px]:hidden">
-                 <img 
-                   src="/images/palace.svg" 
-                   alt="Palace" 
-                   className="w-auto modal-palace-img" 
-                   style={{ height: 'calc(64px + 64px + 0.1em)' }} 
-                 />
-               </div>
-               <h1 className={`${fontFamily.heading} text-[#FDFEFF] mb-8 pt-2 pb-2 max-[530px]:mb-6`} style={{ lineHeight: '0.9' }}>
-                 <div className="modal-title-line1" style={{ fontSize: '7vw' }}>
-                   <span className="modal-title-AN font-bold" style={{ fontSize: '7vw' }}>AN</span>
-                 </div>
-                 <div className="modal-title-line2" style={{ fontSize: '7vw' }}>Atlas</div>
-               </h1>
-             
-             <div className={`space-y-4 ${typography.body.default} text-[#FDFEFF] mb-10 max-[530px]:mb-8`}>
-               <p style={{ fontWeight: 'bold' }}>Mediocre buildings need not apply.</p>
-               <p>This radar scans for the best of Art Deco, Brutalism, and Stalinist Gothic. Follow the deep red markers to find the ominous and the powerful.</p>
-             </div>
-
-             <button
-               onClick={handleLocateMe}
-               className="w-full bg-[#AA8BFF] text-[#010E36] flex items-center justify-center group px-6 py-4 rounded-lg font-bold transition-all hover:opacity-90"
-               aria-label="Initialize scan to find buildings"
-             >
-                <Scan className="mr-2" size={18} strokeWidth={2.5} aria-hidden="true"/>
-                Initialize Scan
-             </button>
-          </div>
-          
-          {/* Tracking status - below modal, side by side */}
-          <div className="absolute top-[calc(50%+280px)] left-1/2 transform -translate-x-1/2 flex items-center gap-8 z-30 max-[530px]:flex-col max-[530px]:gap-4 max-[530px]:w-full max-[530px]:px-4 max-[530px]:bottom-20 max-[530px]:top-auto max-[530px]:left-1/2 max-[530px]:transform max-[530px]:-translate-x-1/2 max-[530px]:justify-center">
-            <div className={`flex items-center gap-2 ${typography.body.sm} text-[#BAB2CF] max-[530px]:w-full max-[530px]:justify-center`}>
-              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
-              <span>Architecture tracking active</span>
-            </div>
-            <div className={`flex items-center gap-2 ${typography.body.sm} text-[#BAB2CF] max-[530px]:w-full max-[530px]:justify-center`}>
-              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></div>
-              <span>Nick tracking active</span>
-            </div>
-          </div>
-        </div>
-        </>
+      {/* The "N" Button - Bottom Left - Only show after intro completes */}
+      {introState === 'complete' && (
+        <button
+          onClick={handleNButton}
+          className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 transition-all flex items-center justify-center group hover:scale-105"
+          title="The Architect"
+          aria-label="The Architect"
+        >
+          <Heart size={20} className="group-hover:scale-110 transition-all fill-current" style={{ color: '#FF5D88' }} aria-hidden="true" />
+        </button>
       )}
+
+
 
       {/* Error Toast */}
       {error && (
@@ -1821,10 +1781,12 @@ function App() {
         </div>
       )}
 
-      {/* Footer text - always visible at bottom center */}
-      <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center">
-        <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
-      </div>
+      {/* Footer text - only visible after intro completes */}
+      {introState === 'complete' && (
+        <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center">
+          <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
+        </div>
+      )}
 
       {/* Subtle force Gemini search button - bottom right (left of backfill) */}
       {buttonsVisible && (
