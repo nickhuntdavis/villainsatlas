@@ -103,6 +103,63 @@ function App() {
     }
   }, [theme]);
 
+  // On load: if geolocation permission is already granted, move map to user location
+  // and preload nearby Baserow buildings in the background (without touching the intro UI).
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') return;
+    if (!('geolocation' in navigator)) return;
+
+    const nav: any = navigator as any;
+
+    const loadUserLocationAndBuildings = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const newCenter: Coordinates = { lat: latitude, lng: longitude };
+          setCenter(newCenter);
+          setUserLocation(newCenter);
+
+          try {
+            const nearbyBuildings = await getBaserowBuildingsNear(newCenter, 50000); // 50km radius
+            if (nearbyBuildings && nearbyBuildings.length > 0) {
+              // Sort results: prioritized buildings first
+              const sortedResults = nearbyBuildings.sort((a, b) => {
+                if (a.isPrioritized && !b.isPrioritized) return -1;
+                if (!a.isPrioritized && b.isPrioritized) return 1;
+                return 0;
+              });
+
+              setBuildings((prev) => mergeBuildings(prev, sortedResults));
+            }
+          } catch (err) {
+            console.error('Error preloading nearby buildings for user location:', err);
+          }
+        },
+        (error) => {
+          // Silently ignore errors here; explicit actions (like Locate Me) handle user-facing errors
+          console.warn('Background geolocation failed:', error);
+        }
+      );
+    };
+
+    // Prefer Permissions API when available so we only auto-run when permission is already granted
+    if (nav.permissions && typeof nav.permissions.query === 'function') {
+      try {
+        nav.permissions
+          .query({ name: 'geolocation' as PermissionName })
+          .then((result: PermissionStatus) => {
+            if (result.state === 'granted') {
+              loadUserLocationAndBuildings();
+            }
+          })
+          .catch(() => {
+            // If Permissions API query fails, do nothing; explicit user actions will still work
+          });
+      } catch {
+        // Fallback: do nothing; explicit user actions will still work
+      }
+    }
+  }, []);
 
   // Keyboard handler for H key to toggle button visibility
   useEffect(() => {
@@ -1739,8 +1796,12 @@ function App() {
                 await toggleFavouriteInBaserow(rowId, newFavouriteStatus);
                 console.log(`✅ ${newFavouriteStatus ? 'Added' : 'Removed'} "${selectedBuilding.name}" ${newFavouriteStatus ? 'to' : 'from'} favourites`);
                 
-                // Update building in local state
-                const updatedBuilding = { ...selectedBuilding, favourites: newFavouriteStatus };
+                // Update building in local state (favourites also imply prioritized flag)
+                const updatedBuilding = {
+                  ...selectedBuilding,
+                  favourites: newFavouriteStatus,
+                  isPrioritized: newFavouriteStatus,
+                };
                 setSelectedBuilding(updatedBuilding);
                 setBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
                 

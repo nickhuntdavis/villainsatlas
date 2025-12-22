@@ -27,7 +27,8 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
   const [name, setName] = useState(building?.name || '');
   const [notes, setNotes] = useState(building?.description || '');
   const [architect, setArchitect] = useState(building?.architect || '');
-  const [style, setStyle] = useState<ArchitecturalStyle | ''>(building?.style || '');
+  // Allow free-form styles (with suggestions from ArchitecturalStyle enum)
+  const [style, setStyle] = useState<string>(building?.style || '');
   const [location, setLocation] = useState(building?.location || '');
   const [formCoordinates, setFormCoordinates] = useState<Coordinates>(
     building?.coordinates || coordinates || { lat: 0, lng: 0 }
@@ -179,7 +180,7 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
         description: notes.trim(),
         location: location.trim(),
         coordinates: formCoordinates,
-        style: style || undefined,
+        style: style.trim() || undefined,
         architect: architect.trim() || undefined,
         city: building?.city,
         country: building?.country,
@@ -200,7 +201,7 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
     }
   };
   
-  // Get all architectural style options
+  // Get all architectural style options for suggestions
   const styleOptions = Object.values(ArchitecturalStyle);
   
   return (
@@ -376,24 +377,28 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
             />
           </div>
 
-          {/* Style */}
+          {/* Style (select from list or type your own) */}
           <div>
             <label className={`${typography.label.default} text-[#FDFEFF] block mb-2`}>
               Style
             </label>
-            <select
+            <input
+              type="text"
               value={style}
-              onChange={(e) => setStyle(e.target.value as ArchitecturalStyle | '')}
+              onChange={(e) => setStyle(e.target.value)}
+              list="style-options"
+              placeholder="Start typing or choose from list..."
               className="w-full px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
               disabled={isSaving}
-            >
-              <option value="">Select a style...</option>
+            />
+            <datalist id="style-options">
               {styleOptions.map((styleOption) => (
-                <option key={styleOption} value={styleOption}>
-                  {styleOption}
-                </option>
+                <option key={styleOption} value={styleOption} />
               ))}
-            </select>
+            </datalist>
+            <p className="mt-1 text-xs text-[#BAB2CF]">
+              Choose a style from the list or type a new one (e.g. &quot;Ancient&quot;).
+            </p>
           </div>
 
           {/* Buttons */}

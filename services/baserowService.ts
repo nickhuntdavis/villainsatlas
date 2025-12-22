@@ -571,6 +571,7 @@ export const hideBuildingInBaserow = async (rowId: number): Promise<void> => {
 };
 
 // Toggle favourites status for a building in Baserow
+// Also keeps is_prioritized in sync with favourites (favourites imply prioritized)
 export const toggleFavouriteInBaserow = async (rowId: number, isFavourite: boolean): Promise<void> => {
   try {
     const response = await fetch(
@@ -581,7 +582,10 @@ export const toggleFavouriteInBaserow = async (rowId: number, isFavourite: boole
           Authorization: `Token ${API_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ favourites: isFavourite }),
+        body: JSON.stringify({
+          favourites: isFavourite,
+          is_prioritized: isFavourite,
+        }),
       }
     );
 
