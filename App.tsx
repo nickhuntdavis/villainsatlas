@@ -27,6 +27,7 @@ import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan, X } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
 import { typography, getThemeColors, fontFamily } from './ui/theme';
+import { loadBuildingsFromIndexedDB, saveBuildingsToIndexedDB } from './utils/indexedDB';
 
 function App() {
   const [center, setCenter] = useState<Coordinates>(DEFAULT_COORDINATES);
@@ -34,9 +35,19 @@ function App() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [allBaserowBuildings, setAllBaserowBuildings] = useState<Building[]>([]);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
+  // Track buildings currently being fetched for images to prevent duplicates
+  const fetchingImagesRef = useRef<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [backgroundLoading, setBackgroundLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [introState, setIntroState] = useState<'intro' | 'complete'>('intro');
+  const [introState, setIntroState] = useState<'intro' | 'complete'>(() => {
+    // Check if user has already completed intro
+    if (typeof window !== 'undefined') {
+      const introCompleted = window.localStorage.getItem('evil-atlas-intro-completed');
+      return introCompleted === 'true' ? 'complete' : 'intro';
+    }
+    return 'intro';
+  });
   const [firstLoad, setFirstLoad] = useState(true); // Keep for backward compatibility
   const [searchStatus, setSearchStatus] = useState<'idle' | 'searching_baserow' | 'searching_gemini'>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -102,64 +113,6 @@ function App() {
       window.localStorage.setItem('evil-atlas-theme', theme);
     }
   }, [theme]);
-
-  // On load: if geolocation permission is already granted, move map to user location
-  // and preload nearby Baserow buildings in the background (without touching the intro UI).
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || typeof window === 'undefined') return;
-    if (!('geolocation' in navigator)) return;
-
-    const nav: any = navigator as any;
-
-    const loadUserLocationAndBuildings = () => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          const newCenter: Coordinates = { lat: latitude, lng: longitude };
-          setCenter(newCenter);
-          setUserLocation(newCenter);
-
-          try {
-            const nearbyBuildings = await getBaserowBuildingsNear(newCenter, 50000); // 50km radius
-            if (nearbyBuildings && nearbyBuildings.length > 0) {
-              // Sort results: prioritized buildings first
-              const sortedResults = nearbyBuildings.sort((a, b) => {
-                if (a.isPrioritized && !b.isPrioritized) return -1;
-                if (!a.isPrioritized && b.isPrioritized) return 1;
-                return 0;
-              });
-
-              setBuildings((prev) => mergeBuildings(prev, sortedResults));
-            }
-          } catch (err) {
-            console.error('Error preloading nearby buildings for user location:', err);
-          }
-        },
-        (error) => {
-          // Silently ignore errors here; explicit actions (like Locate Me) handle user-facing errors
-          console.warn('Background geolocation failed:', error);
-        }
-      );
-    };
-
-    // Prefer Permissions API when available so we only auto-run when permission is already granted
-    if (nav.permissions && typeof nav.permissions.query === 'function') {
-      try {
-        nav.permissions
-          .query({ name: 'geolocation' as PermissionName })
-          .then((result: PermissionStatus) => {
-            if (result.state === 'granted') {
-              loadUserLocationAndBuildings();
-            }
-          })
-          .catch(() => {
-            // If Permissions API query fails, do nothing; explicit user actions will still work
-          });
-      } catch {
-        // Fallback: do nothing; explicit user actions will still work
-      }
-    }
-  }, []);
 
   // Keyboard handler for H key to toggle button visibility
   useEffect(() => {
@@ -312,20 +265,39 @@ function App() {
   }, [blacklistedBuildingIds]);
 
   // Helper to get nearby Baserow buildings, preferring in-memory cache
+  // Helper to check if building is in bounding box (faster than distance calculation)
+  const isInBoundingBox = useCallback((center: Coordinates, radiusMeters: number, building: Building): boolean => {
+    if (!building.coordinates || 
+        isNaN(building.coordinates.lat) || 
+        isNaN(building.coordinates.lng) ||
+        building.coordinates.lat === 0 && building.coordinates.lng === 0) {
+      return false;
+    }
+    
+    // Approximate bounding box: ~111km per degree latitude
+    const latRange = radiusMeters / 111000;
+    // Longitude range varies by latitude
+    const lngRange = radiusMeters / (111000 * Math.cos(center.lat * Math.PI / 180));
+    
+    return building.coordinates.lat >= center.lat - latRange &&
+           building.coordinates.lat <= center.lat + latRange &&
+           building.coordinates.lng >= center.lng - lngRange &&
+           building.coordinates.lng <= center.lng + lngRange;
+  }, []);
+
   const getBaserowBuildingsNear = useCallback(
     async (center: Coordinates, radiusMeters: number) => {
       let results: Building[] = [];
       
       if (allBaserowBuildings.length > 0) {
         // Filter by distance and validate coordinates
+        // Use bounding box check first for performance
         results = allBaserowBuildings.filter((b) => {
-          // Skip buildings with invalid coordinates
-          if (!b.coordinates || 
-              isNaN(b.coordinates.lat) || 
-              isNaN(b.coordinates.lng) ||
-              b.coordinates.lat === 0 && b.coordinates.lng === 0) {
+          // Quick bounding box check first (much faster than distance calculation)
+          if (!isInBoundingBox(center, radiusMeters, b)) {
             return false;
           }
+          // Then precise distance check
           const distance = getDistance(center, b.coordinates);
           return distance <= radiusMeters;
         });
@@ -352,32 +324,122 @@ function App() {
       // Filter out blacklisted buildings
       results = filterBlacklistedBuildings(results);
       
-      // Enrich buildings with images if they have google_place_id but no imageUrl
+      // Enrich buildings with images in background - don't block on this
       // Only do this for a reasonable number of buildings to avoid API limits (limit to first 20)
-      const buildingsNeedingImages = results.filter(b => b.googlePlaceId && !b.imageUrl).slice(0, 20);
+      // Skip buildings that are already being fetched to prevent duplicate API calls
+      const buildingsNeedingImages = results
+        .filter(b => b.googlePlaceId && !b.imageUrl && !fetchingImagesRef.current.has(b.id))
+        .slice(0, 20);
+        
       if (buildingsNeedingImages.length > 0) {
-        const enrichedBuildings = await Promise.all(
+        // Mark buildings as currently being fetched
+        buildingsNeedingImages.forEach(b => fetchingImagesRef.current.add(b.id));
+        
+        // Enrich in background - don't await
+        Promise.all(
           buildingsNeedingImages.map(b => fetchImageForBuilding(b))
-        );
-        
-        // Update results with enriched versions
-        const enrichedMap = new Map(enrichedBuildings.map(b => [b.id, b]));
-        results = results.map(b => enrichedMap.get(b.id) || b);
-        
-        // Update cache with enriched buildings
-        if (allBaserowBuildings.length > 0) {
+        ).then(enrichedBuildings => {
+          // Remove from fetching set after completion
+          enrichedBuildings.forEach(b => fetchingImagesRef.current.delete(b.id));
+          
+          // Update cache with enriched buildings
           setAllBaserowBuildings((prev) => {
             const updated = new Map(prev.map(b => [b.id, b]));
             enrichedBuildings.forEach(b => updated.set(b.id, b));
             return Array.from(updated.values());
           });
-        }
+          
+          // Update visible buildings if they're still in view
+          setBuildings((prev) => {
+            const enrichedMap = new Map(enrichedBuildings.map(b => [b.id, b]));
+            return prev.map(b => enrichedMap.get(b.id) || b);
+          });
+        }).catch(err => {
+          // Remove from fetching set on error too
+          buildingsNeedingImages.forEach(b => fetchingImagesRef.current.delete(b.id));
+          console.error('Background image enrichment failed:', err);
+        });
       }
       
+      // Return results immediately without waiting for image enrichment
       return results;
     },
-    [allBaserowBuildings, filterBlacklistedBuildings]
+    [allBaserowBuildings, filterBlacklistedBuildings, isInBoundingBox]
   );
+
+  // Function to load user location and nearby buildings
+  // Defined as useCallback so it always has access to latest getBaserowBuildingsNear
+  const loadUserLocationAndBuildings = useCallback(() => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return;
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const newCenter: Coordinates = { lat: latitude, lng: longitude };
+        setCenter(newCenter);
+        setUserLocation(newCenter);
+
+        try {
+          // Get nearby buildings - getBaserowBuildingsNear will handle cache or fetch from API
+          const nearbyBuildings = await getBaserowBuildingsNear(newCenter, 50000); // 50km radius
+          if (nearbyBuildings && nearbyBuildings.length > 0) {
+            // Sort results: prioritized buildings first
+            const sortedResults = nearbyBuildings.sort((a, b) => {
+              if (a.isPrioritized && !b.isPrioritized) return -1;
+              if (!a.isPrioritized && b.isPrioritized) return 1;
+              return 0;
+            });
+
+            // Set buildings - ensure they're set even if prev was empty
+            setBuildings((prev) => {
+              if (prev.length === 0) {
+                // If no buildings yet, just set these directly
+                return sortedResults;
+              }
+              // Otherwise merge
+              return mergeBuildings(prev, sortedResults);
+            });
+            console.log(`✅ Loaded ${sortedResults.length} buildings for user location`);
+          } else {
+            console.log('No nearby buildings found for user location');
+          }
+        } catch (err) {
+          console.error('Error preloading nearby buildings for user location:', err);
+        }
+      },
+      (error) => {
+        // Silently ignore errors here; explicit actions (like Locate Me) handle user-facing errors
+        console.warn('Background geolocation failed:', error);
+      }
+    );
+  }, [getBaserowBuildingsNear]);
+
+  // On load: if geolocation permission is already granted, move map to user location
+  // and preload nearby Baserow buildings in the background (without touching the intro UI).
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') return;
+    if (!('geolocation' in navigator)) return;
+
+    const nav: any = navigator as any;
+
+    // Prefer Permissions API when available so we only auto-run when permission is already granted
+    if (nav.permissions && typeof nav.permissions.query === 'function') {
+      try {
+        nav.permissions
+          .query({ name: 'geolocation' as PermissionName })
+          .then((result: PermissionStatus) => {
+            if (result.state === 'granted') {
+              loadUserLocationAndBuildings();
+            }
+          })
+          .catch(() => {
+            // If Permissions API query fails, do nothing; explicit user actions will still work
+          });
+      } catch {
+        // Fallback: do nothing; explicit user actions will still work
+      }
+    }
+  }, [loadUserLocationAndBuildings]);
 
   // Clear status message shortly after search completes
   useEffect(() => {
@@ -404,11 +466,27 @@ function App() {
   }, []);
 
   // Initial load of all Baserow buildings for caching and display on map
+  // Uses IndexedDB cache for instant loading, then refreshes in background
   useEffect(() => {
     const loadInitialBaserow = async () => {
       try {
-        // Phase 1: Load only first page (200 buildings) for immediate render
-        // This prevents blocking initial render with multiple API calls
+        // Phase 1: Try to load from IndexedDB cache first for instant results
+        const cachedBuildings = await loadBuildingsFromIndexedDB();
+        if (cachedBuildings.length > 0) {
+          // Filter out buildings with invalid coordinates
+          const validCachedBuildings = cachedBuildings.filter((b) => 
+            b.coordinates && 
+            !isNaN(b.coordinates.lat) && 
+            !isNaN(b.coordinates.lng) &&
+            !(b.coordinates.lat === 0 && b.coordinates.lng === 0)
+          );
+          
+          // Set cached buildings immediately for instant render
+          setAllBaserowBuildings(validCachedBuildings);
+          console.log(`⚡ Loaded ${validCachedBuildings.length} buildings from cache`);
+        }
+        
+        // Phase 2: Load from API (first page for immediate render, then all pages)
         const initialBuildings = await fetchAllBuildings(1); // Limit to first page only
         // Filter out buildings with invalid coordinates
         const validInitialBuildings = initialBuildings.filter((b) => 
@@ -418,7 +496,7 @@ function App() {
           !(b.coordinates.lat === 0 && b.coordinates.lng === 0)
         );
         
-        // Set initial buildings immediately for fast first render
+        // Update with fresh first page data
         setAllBaserowBuildings(validInitialBuildings);
         
         // Display buildings within initial map view (50km radius from default center)
@@ -437,7 +515,7 @@ function App() {
           return true;
         });
         
-        // Phase 2: Load remaining pages in background after initial render
+        // Phase 3: Load remaining pages in background after initial render
         // Use requestIdleCallback or setTimeout to defer non-critical loading
         const loadRemainingBuildings = async () => {
           try {
@@ -450,6 +528,8 @@ function App() {
             );
             // Update with complete dataset
             setAllBaserowBuildings(validAllBuildings);
+            // Save to IndexedDB for next time
+            await saveBuildingsToIndexedDB(validAllBuildings);
             
             // Update buildings in view if any new ones are in viewport
             const updatedBuildingsInView = validAllBuildings.filter((b) => {
@@ -552,6 +632,10 @@ function App() {
   const handleStartScan = useCallback(() => {
     setIntroState('complete');
     setFirstLoad(false);
+    // Remember that user has completed intro
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('evil-atlas-intro-completed', 'true');
+    }
   }, []);
 
   const handleLocateMe = useCallback(() => {
@@ -1031,7 +1115,7 @@ function App() {
       if (rateLimitError) {
         setError("Too many new searches a day will alert the authorities! Wait until midnight to search some more, or browse buildings already visible");
       } else if (sortedResults.length === 0) {
-        setError("No ominous structures detected in this sector.");
+        setError("Nothing ominous here. Try a nearby city or zoom the map and use 'Search Area'.");
       }
       
       // Set status message
@@ -1190,7 +1274,7 @@ function App() {
       if (sortedResults.length > 0) {
         setCenter(center);
       } else {
-        setError("No ominous structures detected in this sector.");
+        setError("Nothing ominous here. Try searching for a major city or zoom out and use 'Search Area'.");
       }
     } catch (err: any) {
       console.error(err);
@@ -1687,6 +1771,7 @@ function App() {
           adminModeEnabled={adminModeEnabled}
           onMapClick={handleMapClick}
           onEditBuilding={handleEditBuilding}
+          userLocation={userLocation}
         />
         {/* Map color overlay - only in dark mode */}
         {theme === 'dark' && (
@@ -1714,6 +1799,17 @@ function App() {
         <LandingSequence onInitialize={handleStartScan} />
       )}
       
+      {/* Background Loading Indicator */}
+      {introState === 'complete' && backgroundLoading && (
+        <div className="absolute top-20 left-6 z-20 pointer-events-none">
+          <div className="bg-[#282C55]/90 px-3 py-1.5 rounded-md border border-[#3A3F6B]">
+            <p className="text-[#AA8BFF]/80 text-xs font-mono" style={{ fontSize: '11px' }}>
+              Scanning...
+            </p>
+          </div>
+        </div>
+      )}
+      
       {/* Search Bar - Floating - Only show after intro completes */}
       {introState === 'complete' && (
         <SearchPanel 
@@ -1730,6 +1826,7 @@ function App() {
           
           // Load nearby Baserow buildings so pins are visible
           try {
+            setBackgroundLoading(true);
             const nearbyBuildings = await getBaserowBuildingsNear(building.coordinates, 50000); // 50km radius
             console.log(`Found ${nearbyBuildings.length} nearby buildings for autosuggest selection`);
             
@@ -1751,6 +1848,8 @@ function App() {
             console.error("Error loading nearby buildings for autosuggest selection:", err);
             // Still show the selected building even if loading nearby fails
             setBuildings((prev) => mergeBuildings(prev, [building]));
+          } finally {
+            setBackgroundLoading(false);
           }
         }}
         />
@@ -1805,8 +1904,12 @@ function App() {
                 setSelectedBuilding(updatedBuilding);
                 setBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
                 
-                // Show success message
-                setStatusMessage(`${newFavouriteStatus ? 'Added' : 'Removed'} "${selectedBuilding.name}" ${newFavouriteStatus ? 'to' : 'from'} favourites`);
+                // Show success message with prioritization info
+                if (newFavouriteStatus) {
+                  setStatusMessage(`Added to favourites. "${selectedBuilding.name}" is now prioritized on the map.`);
+                } else {
+                  setStatusMessage(`Removed "${selectedBuilding.name}" from favourites`);
+                }
               } catch (err) {
                 console.error(`Failed to toggle favourite for "${selectedBuilding.name}":`, err);
                 setError(`Failed to ${newFavouriteStatus ? 'add' : 'remove'} favourite`);
@@ -1838,7 +1941,7 @@ function App() {
             <h4 className={`${typography.label.button} ${colors.text.primary} mb-2`}>System Alert</h4>
             <p className={typography.body.sm}>{error}</p>
           </div>
-          <button onClick={() => setError(null)} className={`ml-4 ${colors.text.muted} hover:opacity-80`} aria-label="Close error message"><Info size={16} aria-hidden="true"/></button>
+          <button onClick={() => setError(null)} className={`ml-4 ${colors.text.muted} hover:opacity-80`} aria-label="Close error message"><X size={16} aria-hidden="true"/></button>
         </div>
       )}
 

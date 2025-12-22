@@ -31,6 +31,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   const [suggestions, setSuggestions] = useState<Building[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [showKeyboardHint, setShowKeyboardHint] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +102,16 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, searchStatus, shuffledMessages.length]);
 
+  // Check if keyboard hint has been shown before
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hintSeen = window.localStorage.getItem('evil-atlas-autosuggest-hint-seen');
+      if (!hintSeen) {
+        setShowKeyboardHint(true);
+      }
+    }
+  }, []);
+
   // Debounced filtering function for autosuggest
   const filterSuggestions = useCallback((searchQuery: string) => {
     if (searchQuery.length < 3) {
@@ -124,7 +135,21 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     setSuggestions(filtered);
     setShowSuggestions(filtered.length > 0);
     setSelectedIndex(-1);
-  }, [allBuildings]);
+    
+    // Show keyboard hint on first autosuggest interaction
+    if (filtered.length > 0 && showKeyboardHint && typeof window !== 'undefined') {
+      const hintSeen = window.localStorage.getItem('evil-atlas-autosuggest-hint-seen');
+      if (!hintSeen) {
+        // Hide hint after 5 seconds
+        setTimeout(() => {
+          setShowKeyboardHint(false);
+          window.localStorage.setItem('evil-atlas-autosuggest-hint-seen', 'true');
+        }, 5000);
+      } else {
+        setShowKeyboardHint(false);
+      }
+    }
+  }, [allBuildings, showKeyboardHint]);
 
   // Debounce the filtering
   useEffect(() => {
@@ -284,6 +309,21 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           </button>
         </div>
         
+        {/* Keyboard Navigation Hint */}
+        {showSuggestions && suggestions.length > 0 && showKeyboardHint && (
+          <div className="absolute top-full left-0 right-0 mt-1 px-4 py-1.5 pointer-events-none z-45">
+            <p 
+              className="text-[#AA8BFF]/60 text-xs"
+              style={{
+                fontSize: '11px',
+                fontFamily: 'Inter, sans-serif'
+              }}
+            >
+              Use ↑↓ to navigate, Enter to select
+            </p>
+          </div>
+        )}
+
         {/* Autosuggest Dropdown */}
         {showSuggestions && suggestions.length > 0 && (
           <div
@@ -291,6 +331,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             id="suggestions-list"
             className="absolute top-full left-0 right-0 mt-1 bg-[#282C55] rounded-[10px] shadow-lg border border-[#3A3F6B] overflow-hidden z-50"
             style={{
+              marginTop: showKeyboardHint ? '2.5rem' : '0.25rem',
               boxShadow: '0px 4px 20px 0px rgba(1,10,36,0.4)',
               maxHeight: '300px',
               overflowY: 'auto'
@@ -302,6 +343,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               const locationText = building.city && building.country
                 ? `${building.city}, ${building.country}`
                 : building.location || 'Unknown Location';
+              
+              // Extract first style if comma-separated
+              const firstStyle = building.style ? building.style.split(',')[0].trim() : null;
+              const countryCode = building.country || null;
               
               return (
                 <button
@@ -317,24 +362,41 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                   role="option"
                   aria-selected={selectedIndex === index}
                 >
-                  <div 
-                    className="font-medium text-white truncate"
-                    style={{ 
-                      fontSize: '16px',
-                      fontFamily: 'Inter, sans-serif',
-                      fontWeight: 500
-                    }}
-                  >
-                    {building.name}
-                  </div>
-                  <div 
-                    className="text-[#BAB2CF] text-sm truncate mt-0.5"
-                    style={{ 
-                      fontSize: '14px',
-                      fontFamily: 'Inter, sans-serif'
-                    }}
-                  >
-                    {locationText}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div 
+                        className="font-medium text-white truncate"
+                        style={{ 
+                          fontSize: '16px',
+                          fontFamily: 'Inter, sans-serif',
+                          fontWeight: 500
+                        }}
+                      >
+                        {building.name}
+                      </div>
+                      <div 
+                        className="text-[#BAB2CF] text-sm truncate mt-0.5"
+                        style={{ 
+                          fontSize: '14px',
+                          fontFamily: 'Inter, sans-serif'
+                        }}
+                      >
+                        {locationText}
+                      </div>
+                    </div>
+                    {(firstStyle || countryCode) && (
+                      <div 
+                        className="text-[#AA8BFF]/60 text-xs whitespace-nowrap flex items-center gap-1.5"
+                        style={{ 
+                          fontSize: '12px',
+                          fontFamily: 'Inter, sans-serif'
+                        }}
+                      >
+                        {firstStyle && <span>{firstStyle}</span>}
+                        {firstStyle && countryCode && <span>·</span>}
+                        {countryCode && <span>{countryCode}</span>}
+                      </div>
+                    )}
                   </div>
                 </button>
               );

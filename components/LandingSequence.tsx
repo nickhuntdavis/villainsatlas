@@ -136,6 +136,9 @@ const LandingSequence: React.FC<LandingSequenceProps> = ({ onInitialize }) => {
           <p className="mt-6 text-[10px] font-mono tracking-[0.3em] uppercase text-white/30 animate-pulse">
             Hold to Synchronize
           </p>
+          <p className="mt-3 text-[9px] font-mono text-white/20 max-w-xs text-center">
+            You can still browse the map without syncing
+          </p>
         </div>
       </div>
 

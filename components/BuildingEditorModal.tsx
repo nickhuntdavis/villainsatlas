@@ -44,6 +44,13 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    coordinates?: string;
+    location?: string;
+  }>({});
+  
   // Reverse geocode location when coordinates are set (add mode) or changed
   useEffect(() => {
     const fetchLocation = async () => {
@@ -153,21 +160,26 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
     e.preventDefault();
     
     // Validation
+    const errors: { name?: string; coordinates?: string; location?: string } = {};
+    
     if (!name.trim()) {
-      alert('Name is required');
-      return;
+      errors.name = 'Name is required';
     }
     
     if (!formCoordinates || isNaN(formCoordinates.lat) || isNaN(formCoordinates.lng)) {
-      alert('Valid coordinates are required');
-      return;
+      errors.coordinates = 'Valid coordinates are required';
     }
     
     if (!location.trim()) {
-      alert('Location is required');
+      errors.location = 'Location is required';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       return;
     }
     
+    setValidationErrors({});
     setIsSaving(true);
     
     try {
@@ -195,7 +207,7 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
       onCancel();
     } catch (error) {
       console.error('Failed to save building:', error);
-      alert(`Failed to save building: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setValidationErrors({ coordinates: `Failed to save building: ${error instanceof Error ? error.message : 'Unknown error'}` });
     } finally {
       setIsSaving(false);
     }
@@ -231,11 +243,28 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
+              onChange={(e) => {
+                setName(e.target.value);
+                if (validationErrors.name) {
+                  setValidationErrors(prev => ({ ...prev, name: undefined }));
+                }
+              }}
+              onBlur={() => {
+                if (!name.trim()) {
+                  setValidationErrors(prev => ({ ...prev, name: 'Name is required' }));
+                }
+              }}
+              className={`w-full px-4 py-2 bg-[#1A1D3A] border rounded-md text-[#FDFEFF] focus:outline-none focus:ring-1 ${
+                validationErrors.name 
+                  ? 'border-[#FF5D88] focus:border-[#FF5D88] focus:ring-[#FF5D88]' 
+                  : 'border-[#BAB2CF]/20 focus:border-[#FF5D88] focus:ring-[#FF5D88]'
+              }`}
               required
               disabled={isSaving}
             />
+            {validationErrors.name && (
+              <p className="mt-1 text-[#FF5D88] text-sm">{validationErrors.name}</p>
+            )}
           </div>
 
           {/* Location (required) */}
@@ -247,11 +276,28 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
             <input
               type="text"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
+              onChange={(e) => {
+                setLocation(e.target.value);
+                if (validationErrors.location) {
+                  setValidationErrors(prev => ({ ...prev, location: undefined }));
+                }
+              }}
+              onBlur={() => {
+                if (!location.trim()) {
+                  setValidationErrors(prev => ({ ...prev, location: 'Location is required' }));
+                }
+              }}
+              className={`w-full px-4 py-2 bg-[#1A1D3A] border rounded-md text-[#FDFEFF] focus:outline-none focus:ring-1 ${
+                validationErrors.location 
+                  ? 'border-[#FF5D88] focus:border-[#FF5D88] focus:ring-[#FF5D88]' 
+                  : 'border-[#BAB2CF]/20 focus:border-[#FF5D88] focus:ring-[#FF5D88]'
+              }`}
               required
               disabled={isSaving || isLoadingLocation}
             />
+            {validationErrors.location && (
+              <p className="mt-1 text-[#FF5D88] text-sm">{validationErrors.location}</p>
+            )}
           </div>
 
           {/* Coordinates (read-only) */}
@@ -263,22 +309,53 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
               <input
                 type="number"
                 value={formCoordinates.lat}
-                onChange={(e) => setFormCoordinates({ ...formCoordinates, lat: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => {
+                  setFormCoordinates({ ...formCoordinates, lat: parseFloat(e.target.value) || 0 });
+                  if (validationErrors.coordinates) {
+                    setValidationErrors(prev => ({ ...prev, coordinates: undefined }));
+                  }
+                }}
+                onBlur={() => {
+                  if (!formCoordinates || isNaN(formCoordinates.lat) || isNaN(formCoordinates.lng)) {
+                    setValidationErrors(prev => ({ ...prev, coordinates: 'Valid coordinates are required' }));
+                  }
+                }}
                 step="any"
-                className="flex-1 px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
+                className={`flex-1 px-4 py-2 bg-[#1A1D3A] border rounded-md text-[#FDFEFF] focus:outline-none focus:ring-1 ${
+                  validationErrors.coordinates 
+                    ? 'border-[#FF5D88] focus:border-[#FF5D88] focus:ring-[#FF5D88]' 
+                    : 'border-[#BAB2CF]/20 focus:border-[#FF5D88] focus:ring-[#FF5D88]'
+                }`}
                 placeholder="Latitude"
                 disabled={isSaving}
               />
               <input
                 type="number"
                 value={formCoordinates.lng}
-                onChange={(e) => setFormCoordinates({ ...formCoordinates, lng: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => {
+                  setFormCoordinates({ ...formCoordinates, lng: parseFloat(e.target.value) || 0 });
+                  if (validationErrors.coordinates) {
+                    setValidationErrors(prev => ({ ...prev, coordinates: undefined }));
+                  }
+                }}
+                onBlur={() => {
+                  if (!formCoordinates || isNaN(formCoordinates.lat) || isNaN(formCoordinates.lng)) {
+                    setValidationErrors(prev => ({ ...prev, coordinates: 'Valid coordinates are required' }));
+                  }
+                }}
                 step="any"
-                className="flex-1 px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
+                className={`flex-1 px-4 py-2 bg-[#1A1D3A] border rounded-md text-[#FDFEFF] focus:outline-none focus:ring-1 ${
+                  validationErrors.coordinates 
+                    ? 'border-[#FF5D88] focus:border-[#FF5D88] focus:ring-[#FF5D88]' 
+                    : 'border-[#BAB2CF]/20 focus:border-[#FF5D88] focus:ring-[#FF5D88]'
+                }`}
                 placeholder="Longitude"
                 disabled={isSaving}
               />
             </div>
+            {validationErrors.coordinates && (
+              <p className="mt-1 text-[#FF5D88] text-sm">{validationErrors.coordinates}</p>
+            )}
           </div>
 
           {/* Notes/Description */}
@@ -396,7 +473,26 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
                 <option key={styleOption} value={styleOption} />
               ))}
             </datalist>
-            <p className="mt-1 text-xs text-[#BAB2CF]">
+            {/* Style suggestion chips */}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['Art Deco', 'Brutalism', 'Ancient', 'Stalinist Gothic', 'Modernist'].map((suggestedStyle) => (
+                <button
+                  key={suggestedStyle}
+                  type="button"
+                  onClick={() => setStyle(suggestedStyle)}
+                  className="px-3 py-1 bg-[#3A3F6B]/80 hover:bg-[#3A3F6B] text-white text-sm rounded-full transition-colors border border-[#3A3F6B]"
+                  style={{
+                    fontSize: '13px',
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: 400
+                  }}
+                  disabled={isSaving}
+                >
+                  {suggestedStyle}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-[#BAB2CF]">
               Choose a style from the list or type a new one (e.g. &quot;Ancient&quot;).
             </p>
           </div>

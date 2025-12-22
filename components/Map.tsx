@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, ZoomControl, useMap, useMapEvents, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Coordinates, Building } from '../types';
 import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM } from '../constants';
@@ -182,11 +182,24 @@ interface MapProps {
   adminModeEnabled?: boolean;
   onMapClick?: (coordinates: Coordinates) => void;
   onEditBuilding?: (building: Building) => void;
+  userLocation?: Coordinates | null;
 }
 
-export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick, adminModeEnabled = false, onMapClick, onEditBuilding }) => {
+export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick, adminModeEnabled = false, onMapClick, onEditBuilding, userLocation }) => {
   const isDark = theme === 'dark';
   const colors = getThemeColors(theme);
+  const [showUserLocation, setShowUserLocation] = useState(true);
+  
+  // Auto-hide user location indicator after 10 seconds
+  useEffect(() => {
+    if (userLocation) {
+      setShowUserLocation(true);
+      const timer = setTimeout(() => {
+        setShowUserLocation(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [userLocation]);
 
   return (
     <MapContainer
@@ -221,6 +234,38 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
       <LCPOptimizer />
       {adminModeEnabled && onMapClick && (
         <MapClickHandler enabled={adminModeEnabled} onMapClick={onMapClick} />
+      )}
+
+      {/* User Location Indicator */}
+      {userLocation && showUserLocation && (
+        <>
+          <CircleMarker
+            center={[userLocation.lat, userLocation.lng]}
+            radius={8}
+            pathOptions={{
+              color: '#AA8BFF',
+              fillColor: '#AA8BFF',
+              fillOpacity: 0.6,
+              weight: 2
+            }}
+          >
+            <Popup>
+              <div className="text-sm font-medium">You are here</div>
+            </Popup>
+          </CircleMarker>
+          {/* Pulsing circle for user location */}
+          <CircleMarker
+            center={[userLocation.lat, userLocation.lng]}
+            radius={12}
+            pathOptions={{
+              color: '#AA8BFF',
+              fillColor: 'transparent',
+              fillOpacity: 0,
+              weight: 2,
+              opacity: 0.4
+            }}
+          />
+        </>
       )}
 
       {buildings.map((b) => (

@@ -171,11 +171,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, buildingName
               }}
               src={imageUrl}
               alt={`${buildingName} - Image ${index + 1}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-opacity duration-300"
+              style={{ opacity: 0 }}
               loading={index === 0 ? "eager" : "lazy"}
               decoding="async"
               onLoad={(e) => {
                 const img = e.currentTarget;
+                img.style.opacity = '1';
                 handleImageLoad(index, img);
               }}
               onError={(e) => {
