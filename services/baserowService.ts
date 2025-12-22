@@ -915,7 +915,7 @@ export const addCommentToBuilding = async (rowId: number, commentText: string): 
         const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
         const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
         const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
-        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>(.*?)<\/div>/s);
+        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>([\s\S]*?)<\/div>$/);
         const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
         existingComments.push({
           text: content.trim(),
@@ -954,7 +954,7 @@ export const addCommentToBuilding = async (rowId: number, commentText: string): 
     }
 
     const updatedRow: BaserowRow = await updateResponse.json();
-    return convertRowToBuilding(updatedRow);
+    return baserowRowToBuilding(updatedRow);
   } catch (error) {
     console.error("Error adding comment to building:", error);
     throw error;
@@ -991,7 +991,7 @@ export const updateCommentInBuilding = async (rowId: number, commentIndex: numbe
         const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
         const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
         const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
-        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>(.*?)<\/div>/s);
+        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>([\s\S]*?)<\/div>$/);
         const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
         existingComments.push({
           text: content.trim(),
@@ -1034,7 +1034,7 @@ export const updateCommentInBuilding = async (rowId: number, commentIndex: numbe
     }
 
     const updatedRow: BaserowRow = await updateResponse.json();
-    return convertRowToBuilding(updatedRow);
+    return baserowRowToBuilding(updatedRow);
   } catch (error) {
     console.error("Error updating comment:", error);
     throw error;
@@ -1071,7 +1071,7 @@ export const deleteCommentFromBuilding = async (rowId: number, commentIndex: num
         const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
         const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
         const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
-        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>(.*?)<\/div>/s);
+        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>([\s\S]*?)<\/div>$/);
         const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
         existingComments.push({
           text: content.trim(),
@@ -1110,7 +1110,7 @@ export const deleteCommentFromBuilding = async (rowId: number, commentIndex: num
     }
 
     const updatedRow: BaserowRow = await updateResponse.json();
-    return convertRowToBuilding(updatedRow);
+    return baserowRowToBuilding(updatedRow);
   } catch (error) {
     console.error("Error deleting comment:", error);
     throw error;
