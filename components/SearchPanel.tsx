@@ -289,10 +289,13 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               fontFamily: 'Inter, sans-serif',
               fontWeight: 500
             }}
+            role="combobox"
             aria-label="Search for buildings"
             aria-autocomplete="list"
             aria-expanded={showSuggestions}
             aria-controls="suggestions-list"
+            aria-haspopup="listbox"
+            aria-activedescendant={selectedIndex >= 0 ? `suggestion-${suggestions[selectedIndex]?.id}` : undefined}
           />
           
           <button
@@ -361,6 +364,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                   }`}
                   role="option"
                   aria-selected={selectedIndex === index}
+                  id={`suggestion-${building.id}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">

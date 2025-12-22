@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import { Building, ArchitecturalStyle } from '../types';
 import { getPrimaryStyleColor } from '../constants';
@@ -63,13 +63,57 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     hasPurpleHeart: building.hasPurpleHeart || isDisgusting || false,
   });
 
+  // Create accessible label for the marker
+  const markerLabel = building.city && building.country
+    ? `${building.name}, ${building.city}, ${building.country}`
+    : building.location
+    ? `${building.name}, ${building.location}`
+    : building.name;
+
+  // Ref callback to access the Leaflet marker instance
+  const markerRefCallback = (markerInstance: L.Marker | null) => {
+    if (markerInstance) {
+      const markerElement = markerInstance.getElement();
+      if (markerElement) {
+        const iconElement = markerElement.querySelector('.leaflet-marker-icon') as HTMLElement;
+        if (iconElement) {
+          // Add aria-label and title for accessibility
+          iconElement.setAttribute('aria-label', markerLabel);
+          iconElement.setAttribute('title', markerLabel);
+          iconElement.setAttribute('role', 'button');
+          
+          // Ensure minimum touch target size (48x48px) for mobile accessibility
+          const currentWidth = iconElement.offsetWidth || 24;
+          const currentHeight = iconElement.offsetHeight || 24;
+          const minSize = 48;
+          
+          if (currentWidth < minSize || currentHeight < minSize) {
+            // Add padding to increase touch target to at least 48px
+            const paddingX = Math.max(0, (minSize - currentWidth) / 2);
+            const paddingY = Math.max(0, (minSize - currentHeight) / 2);
+            iconElement.style.padding = `${paddingY}px ${paddingX}px`;
+            iconElement.style.minWidth = `${minSize}px`;
+            iconElement.style.minHeight = `${minSize}px`;
+            iconElement.style.display = 'flex';
+            iconElement.style.alignItems = 'center';
+            iconElement.style.justifyContent = 'center';
+            iconElement.style.boxSizing = 'border-box';
+          }
+        }
+      }
+    }
+  };
+
   return (
     <Marker
+      ref={markerRefCallback}
       position={[building.coordinates.lat, building.coordinates.lng]}
       icon={icon}
+      title={markerLabel}
       eventHandlers={{
         click: handleClick,
       }}
+      keyboard={true}
     >
        {/* We don't use standard Popup often in this design, opting for the side panel, 
            but we keep a minimal tooltip for hover. */}

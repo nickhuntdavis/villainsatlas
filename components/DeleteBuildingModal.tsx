@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Building } from '../types';
 import { X } from 'lucide-react';
 import { PrimaryButton } from '../ui/atoms';
@@ -18,10 +18,39 @@ export const DeleteBuildingModal: React.FC<DeleteBuildingModalProps> = ({
   theme,
 }) => {
   const colors = getThemeColors(theme);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const titleId = `delete-building-title-${building.id}`;
+  const descriptionId = `delete-building-description-${building.id}`;
+
+  // Focus management: focus the modal when it opens
+  useEffect(() => {
+    if (modalRef.current) {
+      const firstButton = modalRef.current.querySelector('button') as HTMLElement;
+      if (firstButton) {
+        firstButton.focus();
+      }
+    }
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-[#010E36]/90 z-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-[#282C55] shadow-xl relative rounded-[32px] overflow-hidden" style={{ padding: '32px' }}>
+    <div 
+      className="fixed inset-0 bg-[#010E36]/90 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
+    >
+      <div 
+        ref={modalRef}
+        className="max-w-md w-full bg-[#282C55] shadow-xl relative rounded-[32px] overflow-hidden" 
+        style={{ padding: '32px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close button */}
         <button
           onClick={onCancel}
@@ -32,9 +61,12 @@ export const DeleteBuildingModal: React.FC<DeleteBuildingModalProps> = ({
           <X size={18} strokeWidth={2} aria-hidden="true" />
         </button>
 
-        <h2 className={`${fontFamily.heading} text-[#FDFEFF] text-2xl mb-4`}>
+        <h2 id={titleId} className={`${fontFamily.heading} text-[#FDFEFF] text-2xl mb-4`}>
           Is this building no good?
         </h2>
+        <p id={descriptionId} className="sr-only">
+          Confirm deletion of {building.name}
+        </p>
 
         {/* Building info */}
         <div className="mb-6">

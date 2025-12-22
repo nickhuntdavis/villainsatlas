@@ -216,9 +216,41 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
   // Get all architectural style options for suggestions
   const styleOptions = Object.values(ArchitecturalStyle);
   
+  const modalTitleId = `building-editor-title-${building?.id || 'new'}`;
+  const modalDescriptionId = `building-editor-description-${building?.id || 'new'}`;
+
+  // Focus management: focus the modal when it opens
+  const modalRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (modalRef.current) {
+      // Focus the modal container or first focusable element
+      const firstInput = modalRef.current.querySelector('input, textarea, button') as HTMLElement;
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-[#010E36]/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="max-w-2xl w-full bg-[#282C55] shadow-xl relative rounded-[32px] overflow-hidden my-8" style={{ padding: '32px' }}>
+    <div 
+      className="fixed inset-0 bg-[#010E36]/90 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={modalTitleId}
+      aria-describedby={modalDescriptionId}
+      onClick={(e) => {
+        // Close modal when clicking backdrop
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
+    >
+      <div 
+        ref={modalRef}
+        className="max-w-2xl w-full bg-[#282C55] shadow-xl relative rounded-[32px] overflow-hidden my-8" 
+        style={{ padding: '32px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close button */}
         <button
           onClick={onCancel}
@@ -230,9 +262,12 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
           <X size={18} strokeWidth={2} aria-hidden="true" />
         </button>
 
-        <h2 className={`${fontFamily.heading} text-[#FDFEFF] text-2xl mb-6`}>
+        <h2 id={modalTitleId} className={`${fontFamily.heading} text-[#FDFEFF] text-2xl mb-6`}>
           {isEditMode ? 'Edit Building' : 'Add New Building'}
         </h2>
+        <p id={modalDescriptionId} className="sr-only">
+          {isEditMode ? `Edit details for ${building?.name || 'this building'}` : 'Add a new building to the atlas'}
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name (required) */}
