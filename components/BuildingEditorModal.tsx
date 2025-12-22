@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Building, ArchitecturalStyle, Coordinates } from '../types';
-import { X, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Bold, Italic, Underline } from 'lucide-react';
 import { PrimaryButton } from '../ui/atoms';
 import { typography, getThemeColors, fontFamily } from '../ui/theme';
 import { reverseGeocode } from '../services/geocodingService';
@@ -27,6 +27,7 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
   const [name, setName] = useState(building?.name || '');
   const [notes, setNotes] = useState(building?.description || '');
   const [architect, setArchitect] = useState(building?.architect || '');
+  const notesEditorRef = useRef<HTMLDivElement>(null);
   // Allow free-form styles (with suggestions from ArchitecturalStyle enum)
   const [style, setStyle] = useState<string>(building?.style || '');
   const [location, setLocation] = useState(building?.location || '');
@@ -94,8 +95,20 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
         });
         setImagePreviews(previews);
       }
+
+      // Initialize rich text editor with existing notes
+      if (notesEditorRef.current && building.description) {
+        notesEditorRef.current.innerHTML = building.description;
+      }
     }
   }, [building]);
+
+  // Initialize notes editor on mount
+  useEffect(() => {
+    if (notesEditorRef.current && notes && !notesEditorRef.current.innerHTML) {
+      notesEditorRef.current.innerHTML = notes;
+    }
+  }, []);
   
   // Handle file upload for a specific slot
   const handleFileChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,10 +199,13 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
       // Collect files that are actually provided
       const filesToUpload = imageFiles.filter((file): file is File => file !== null);
       
+      // Get rich text content from editor
+      const notesHtml = notesEditorRef.current?.innerHTML || notes;
+      
       const buildingData: Building = {
         id: building?.id || `temp-${Date.now()}`,
         name: name.trim(),
-        description: notes.trim(),
+        description: notesHtml.trim(),
         location: location.trim(),
         coordinates: formCoordinates,
         style: style.trim() || undefined,
@@ -393,17 +409,68 @@ export const BuildingEditorModal: React.FC<BuildingEditorModalProps> = ({
             )}
           </div>
 
-          {/* Notes/Description */}
+          {/* Notes/Description - Rich Text */}
           <div>
             <label className={`${typography.label.default} text-[#FDFEFF] block mb-2`}>
               Notes/Description
             </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88] resize-none"
-              disabled={isSaving}
+            {/* Rich text formatting toolbar */}
+            <div className="flex gap-2 mb-2 p-2 bg-[#1A1D3A] rounded-md border border-[#BAB2CF]/20">
+              <button
+                type="button"
+                onClick={() => {
+                  document.execCommand('bold', false);
+                  notesEditorRef.current?.focus();
+                }}
+                className="p-2 hover:bg-[#3A3F6B] rounded transition-colors"
+                title="Bold"
+                aria-label="Bold"
+                disabled={isSaving}
+              >
+                <Bold size={16} className="text-[#FDFEFF]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  document.execCommand('italic', false);
+                  notesEditorRef.current?.focus();
+                }}
+                className="p-2 hover:bg-[#3A3F6B] rounded transition-colors"
+                title="Italic"
+                aria-label="Italic"
+                disabled={isSaving}
+              >
+                <Italic size={16} className="text-[#FDFEFF]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  document.execCommand('underline', false);
+                  notesEditorRef.current?.focus();
+                }}
+                className="p-2 hover:bg-[#3A3F6B] rounded transition-colors"
+                title="Underline"
+                aria-label="Underline"
+                disabled={isSaving}
+              >
+                <Underline size={16} className="text-[#FDFEFF]" />
+              </button>
+            </div>
+            <div
+              ref={notesEditorRef}
+              contentEditable={!isSaving}
+              onInput={(e) => {
+                const html = (e.target as HTMLElement).innerHTML;
+                setNotes(html);
+              }}
+              className="w-full min-h-[100px] px-4 py-2 bg-[#1A1D3A] border border-[#BAB2CF]/20 rounded-md text-[#FDFEFF] focus:outline-none focus:border-[#FF5D88] focus:ring-1 focus:ring-[#FF5D88]"
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '14px',
+                lineHeight: '1.6',
+              }}
+              suppressContentEditableWarning={true}
+              aria-label="Notes/Description"
             />
           </div>
 

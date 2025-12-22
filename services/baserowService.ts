@@ -1,4 +1,4 @@
-import { Building, Coordinates } from "../types";
+import { Building, Coordinates, Comment } from "../types";
 import { optimizeImage } from "../utils/imageOptimizer";
 
 const BASEROW_API_BASE = "https://api.baserow.io/api/database/rows/table";
@@ -57,6 +57,12 @@ interface BaserowRow {
   is_purple_heart?: boolean; // Whether building should have a purple glowing heart
   source?: string; // Source of building entry (e.g., 'manual')
   favourites?: boolean; // Whether building is marked as a favourite
+  comment_1?: string; // Rich text comment field 1
+  comment_2?: string; // Rich text comment field 2
+  comment_3?: string; // Rich text comment field 3
+  comment_4?: string; // Rich text comment field 4
+  comment_5?: string; // Rich text comment field 5
+  comment_6?: string; // Rich text comment field 6
 }
 
 // Extended Building interface for saving (includes Baserow-specific fields)
@@ -200,6 +206,32 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     style = style ? `Cathedral, ${style}` : "Cathedral";
   }
 
+  // Parse comments from comment_1 through comment_6 fields
+  const comments: Comment[] = [];
+  const commentFields = [row.comment_1, row.comment_2, row.comment_3, row.comment_4, row.comment_5, row.comment_6];
+  
+  commentFields.forEach((commentHtml) => {
+    if (commentHtml && commentHtml.trim()) {
+      // Try to extract timestamp from data attributes using regex (works in Node.js)
+      const timestampMatch = commentHtml.match(/data-timestamp="([^"]+)"/);
+      const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
+      const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
+      const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
+      
+      // Extract the actual content (remove wrapper div if present)
+      // Look for content wrapped in <div data-timestamp="...">...</div>
+      // Use a more robust regex that handles nested tags
+      const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>([\s\S]*?)<\/div>$/);
+      const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
+      
+      comments.push({
+        text: content.trim(),
+        createdAt: timestamp,
+        updatedAt: updatedAt || undefined,
+      });
+    }
+  });
+
   return {
     id: `baserow-${row.id}`,
     name: row.name || "Unnamed Building",
@@ -218,6 +250,7 @@ const baserowRowToBuilding = (row: BaserowRow): Building => {
     hasPurpleHeart: !!hasPurpleHeart,
     source: row.source || undefined,
     favourites: row.favourites || false,
+    comments: comments.length > 0 ? comments : undefined,
   };
 };
 
@@ -602,6 +635,19 @@ export const toggleFavouriteInBaserow = async (rowId: number, isFavourite: boole
 // Update an existing building in Baserow
 export const updateBuildingInBaserow = async (rowId: number, building: Building, imageFiles?: File[]): Promise<Building> => {
   try {
+    // Preserve existing comments when updating (don't overwrite them)
+    // Fetch current row to get existing comments
+    const currentResponse = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const currentRow: BaserowRow = currentResponse.ok ? await currentResponse.json() : {} as BaserowRow;
+
     // Use city/country from building if available, otherwise try to parse from location
     let city = (building as BuildingForSave).city || "";
     let country = (building as BuildingForSave).country || "";
@@ -648,6 +694,13 @@ export const updateBuildingInBaserow = async (rowId: number, building: Building,
       location: building.location || "",
       style: building.style || "",
       architect: building.architect || "",
+      // Preserve existing comments
+      comment_1: currentRow.comment_1 || "",
+      comment_2: currentRow.comment_2 || "",
+      comment_3: currentRow.comment_3 || "",
+      comment_4: currentRow.comment_4 || "",
+      comment_5: currentRow.comment_5 || "",
+      comment_6: currentRow.comment_6 || "",
       is_prioritized: building.isPrioritized || false,
       is_purple_heart: building.hasPurpleHeart || false,
       source: building.source || "",
@@ -803,6 +856,263 @@ export const dedupeBaserowBuildings = async (): Promise<number[]> => {
     return deletedIds;
   } catch (error) {
     console.error("Error during dedupe:", error);
+    throw error;
+  }
+};
+
+// Helper function to format comment HTML with timestamp metadata
+const formatCommentHtml = (text: string, createdAt: string, updatedAt?: string): string => {
+  const updatedAttr = updatedAt ? ` data-updated="${updatedAt}"` : '';
+  return `<div data-timestamp="${createdAt}"${updatedAttr}>${text}</div>`;
+};
+
+// Helper function to convert comments array to Baserow comment fields
+const commentsToBaserowFields = (comments: Comment[]): Record<string, string> => {
+  const fields: Record<string, string> = {};
+  const fieldNames = ['comment_1', 'comment_2', 'comment_3', 'comment_4', 'comment_5', 'comment_6'];
+  
+  comments.forEach((comment, index) => {
+    if (index < fieldNames.length) {
+      fields[fieldNames[index]] = formatCommentHtml(comment.text, comment.createdAt, comment.updatedAt);
+    }
+  });
+  
+  // Clear remaining fields
+  for (let i = comments.length; i < fieldNames.length; i++) {
+    fields[fieldNames[i]] = '';
+  }
+  
+  return fields;
+};
+
+// Add a comment to a building
+export const addCommentToBuilding = async (rowId: number, commentText: string): Promise<Building> => {
+  try {
+    // Fetch current building to get existing comments
+    const response = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Baserow API error: ${response.status} - ${errorText}`);
+    }
+
+    const row: BaserowRow = await response.json();
+    
+    // Parse existing comments
+    const existingComments: Comment[] = [];
+    const commentFields = [row.comment_1, row.comment_2, row.comment_3, row.comment_4, row.comment_5, row.comment_6];
+    commentFields.forEach((commentHtml) => {
+      if (commentHtml && commentHtml.trim()) {
+        const timestampMatch = commentHtml.match(/data-timestamp="([^"]+)"/);
+        const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
+        const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
+        const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
+        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>(.*?)<\/div>/s);
+        const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
+        existingComments.push({
+          text: content.trim(),
+          createdAt: timestamp,
+          updatedAt: updatedAt || undefined,
+        });
+      }
+    });
+
+    // Add new comment
+    const newComment: Comment = {
+      text: commentText,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedComments = [...existingComments, newComment];
+
+    // Convert to Baserow fields
+    const commentFieldsUpdate = commentsToBaserowFields(updatedComments);
+
+    // Update building with new comments
+    const updateResponse = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(commentFieldsUpdate),
+      }
+    );
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      throw new Error(`Baserow API error: ${updateResponse.status} - ${errorText}`);
+    }
+
+    const updatedRow: BaserowRow = await updateResponse.json();
+    return convertRowToBuilding(updatedRow);
+  } catch (error) {
+    console.error("Error adding comment to building:", error);
+    throw error;
+  }
+};
+
+// Update a comment at a specific index
+export const updateCommentInBuilding = async (rowId: number, commentIndex: number, commentText: string): Promise<Building> => {
+  try {
+    // Fetch current building
+    const response = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Baserow API error: ${response.status} - ${errorText}`);
+    }
+
+    const row: BaserowRow = await response.json();
+    
+    // Parse existing comments
+    const existingComments: Comment[] = [];
+    const commentFields = [row.comment_1, row.comment_2, row.comment_3, row.comment_4, row.comment_5, row.comment_6];
+    commentFields.forEach((commentHtml) => {
+      if (commentHtml && commentHtml.trim()) {
+        const timestampMatch = commentHtml.match(/data-timestamp="([^"]+)"/);
+        const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
+        const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
+        const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
+        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>(.*?)<\/div>/s);
+        const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
+        existingComments.push({
+          text: content.trim(),
+          createdAt: timestamp,
+          updatedAt: updatedAt || undefined,
+        });
+      }
+    });
+
+    // Update comment at index
+    if (commentIndex >= 0 && commentIndex < existingComments.length) {
+      existingComments[commentIndex] = {
+        ...existingComments[commentIndex],
+        text: commentText,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      throw new Error(`Invalid comment index: ${commentIndex}`);
+    }
+
+    // Convert to Baserow fields
+    const commentFieldsUpdate = commentsToBaserowFields(existingComments);
+
+    // Update building
+    const updateResponse = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(commentFieldsUpdate),
+      }
+    );
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      throw new Error(`Baserow API error: ${updateResponse.status} - ${errorText}`);
+    }
+
+    const updatedRow: BaserowRow = await updateResponse.json();
+    return convertRowToBuilding(updatedRow);
+  } catch (error) {
+    console.error("Error updating comment:", error);
+    throw error;
+  }
+};
+
+// Delete a comment at a specific index
+export const deleteCommentFromBuilding = async (rowId: number, commentIndex: number): Promise<Building> => {
+  try {
+    // Fetch current building
+    const response = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Baserow API error: ${response.status} - ${errorText}`);
+    }
+
+    const row: BaserowRow = await response.json();
+    
+    // Parse existing comments
+    const existingComments: Comment[] = [];
+    const commentFields = [row.comment_1, row.comment_2, row.comment_3, row.comment_4, row.comment_5, row.comment_6];
+    commentFields.forEach((commentHtml) => {
+      if (commentHtml && commentHtml.trim()) {
+        const timestampMatch = commentHtml.match(/data-timestamp="([^"]+)"/);
+        const updatedMatch = commentHtml.match(/data-updated="([^"]+)"/);
+        const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
+        const updatedAt = updatedMatch ? updatedMatch[1] : undefined;
+        const wrapperMatch = commentHtml.match(/<div[^>]*data-timestamp="[^"]*"[^>]*>(.*?)<\/div>/s);
+        const content = wrapperMatch ? wrapperMatch[1] : commentHtml;
+        existingComments.push({
+          text: content.trim(),
+          createdAt: timestamp,
+          updatedAt: updatedAt || undefined,
+        });
+      }
+    });
+
+    // Remove comment at index
+    if (commentIndex >= 0 && commentIndex < existingComments.length) {
+      existingComments.splice(commentIndex, 1);
+    } else {
+      throw new Error(`Invalid comment index: ${commentIndex}`);
+    }
+
+    // Convert to Baserow fields
+    const commentFieldsUpdate = commentsToBaserowFields(existingComments);
+
+    // Update building
+    const updateResponse = await fetch(
+      `${BASEROW_API_BASE}/${TABLE_ID}/${rowId}/?user_field_names=true`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Token ${API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(commentFieldsUpdate),
+      }
+    );
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      throw new Error(`Baserow API error: ${updateResponse.status} - ${errorText}`);
+    }
+
+    const updatedRow: BaserowRow = await updateResponse.json();
+    return convertRowToBuilding(updatedRow);
+  } catch (error) {
+    console.error("Error deleting comment:", error);
     throw error;
   }
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Building, Coordinates } from '../types';
-import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark } from 'lucide-react';
+import { Building, Coordinates, Comment } from '../types';
+import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark, MessageSquare, Edit2, Trash2 } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 import { ImageGallery } from './ImageGallery';
@@ -12,6 +12,9 @@ interface BuildingDetailsProps {
   userLocation?: Coordinates | null;
   onDelete?: () => void;
   onFavourite?: () => void;
+  onAddComment?: () => void;
+  onEditComment?: (index: number) => void;
+  onDeleteComment?: (index: number) => void;
 }
 
 // Helper function to extract URL from markdown link format [text](url) or just return URL if already plain
@@ -53,7 +56,7 @@ const formatDistance = (meters: number): string => {
   return `${(meters / 1000).toFixed(1)}km`;
 };
 
-export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete, onFavourite }) => {
+export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete, onFavourite, onAddComment, onEditComment, onDeleteComment }) => {
   const [imgError, setImgError] = useState(false);
 
   // Reset error state when building changes
@@ -156,10 +159,73 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
         )}
 
         <div className={`${typography.body.default} mb-8 pl-0`}>
-          <p className="leading-relaxed text-white">
-            {building.description}
-          </p>
+          <div 
+            className="leading-relaxed text-white"
+            dangerouslySetInnerHTML={{ __html: building.description || '' }}
+          />
         </div>
+
+        {/* Comments Section */}
+        {building.comments && building.comments.length > 0 && (
+          <div className="mb-8">
+            <h3 className={`${typography.label.heading} text-white mb-4`}>Comments</h3>
+            <div className="space-y-4">
+              {building.comments.map((comment, index) => {
+                const date = new Date(comment.createdAt);
+                const formattedDate = date.toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                
+                return (
+                  <div key={index} className="bg-[#1A1D3A] rounded-lg p-4 border border-[#BAB2CF]/20">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div 
+                          className="text-white text-sm leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: comment.text }}
+                        />
+                      </div>
+                      {(onEditComment || onDeleteComment) && (
+                        <div className="flex gap-2 ml-4">
+                          {onEditComment && (
+                            <button
+                              onClick={() => onEditComment(index)}
+                              className="p-1.5 hover:bg-[#3A3F6B] rounded transition-colors"
+                              title="Edit comment"
+                              aria-label="Edit comment"
+                            >
+                              <Edit2 size={14} className="text-[#BAB2CF]" />
+                            </button>
+                          )}
+                          {onDeleteComment && (
+                            <button
+                              onClick={() => onDeleteComment(index)}
+                              className="p-1.5 hover:bg-[#3A3F6B] rounded transition-colors"
+                              title="Delete comment"
+                              aria-label="Delete comment"
+                            >
+                              <Trash2 size={14} className="text-[#FF5D88]" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[#BAB2CF] text-xs mt-2">
+                      {formattedDate}
+                      {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
+                        <span className="ml-2">(edited)</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="mt-auto space-y-3">
           {/* Message Nick button - only show for Nick */}
@@ -241,6 +307,17 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                     style={{ color: building.favourites ? '#FFD700' : '#11162F' }}
                   >
                     <Bookmark size={16} strokeWidth={2} fill={building.favourites ? 'currentColor' : 'none'} aria-hidden="true" />
+                  </button>
+                )}
+                {onAddComment && (
+                  <button
+                    onClick={onAddComment}
+                    className="p-1.5 hover:opacity-80 transition-opacity"
+                    title="Add a comment"
+                    aria-label="Add a comment"
+                    style={{ color: '#11162F' }}
+                  >
+                    <MessageSquare size={16} strokeWidth={2} aria-hidden="true" />
                   </button>
                 )}
                 {onDelete && (

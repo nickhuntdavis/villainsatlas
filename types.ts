@@ -46,6 +46,12 @@ export enum ArchitecturalStyle {
   DISGUSTING = 'Disgusting'
 }
 
+export interface Comment {
+  text: string; // Rich text content
+  createdAt: string; // ISO timestamp
+  updatedAt?: string; // ISO timestamp if edited
+}
+
 export interface Building {
   id: string;
   name: string;
@@ -65,6 +71,7 @@ export interface Building {
   hasPurpleHeart?: boolean; // True for special romantic locations that get purple glowing hearts
   source?: string; // Source of building entry (e.g., 'manual' for manually added)
   favourites?: boolean; // True if building is marked as a favourite
+  comments?: Comment[]; // Array of comments (mapped from comment_1 through comment_6 fields)
 }
 
 export interface MapViewState {

@@ -19,10 +19,13 @@ const DeleteBuildingModal = lazy(() =>
 const BuildingEditorModal = lazy(() => 
   import('./components/BuildingEditorModal').then(module => ({ default: module.BuildingEditorModal }))
 );
+const CommentModal = lazy(() => 
+  import('./components/CommentModal').then(module => ({ default: module.CommentModal }))
+);
 import { AdminToggle } from './components/AdminToggle';
 import { Building, Coordinates } from './types';
 import { fetchLairs, geocodeLocation, fetchImageForBuilding, isPOIQuery, searchPOIByName, checkPOIStyleCriteria } from './services/geminiService';
-import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow, hideBuildingInBaserow, toggleFavouriteInBaserow } from './services/baserowService';
+import { fetchAllBuildings, fetchBuildingsNearLocation, fetchBuildingByName, updateBuildingInBaserow, dedupeBaserowBuildings, saveBuildingToBaserow, hideBuildingInBaserow, toggleFavouriteInBaserow, addCommentToBuilding, updateCommentInBuilding, deleteCommentFromBuilding } from './services/baserowService';
 import { DEFAULT_COORDINATES, TARGET_NEAREST_SEARCH_RADIUS } from './constants';
 import { AlertTriangle, Info, Heart, Scan, X } from 'lucide-react';
 import { PrimaryButton } from './ui/atoms';
@@ -72,6 +75,8 @@ function App() {
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [clickedCoordinates, setClickedCoordinates] = useState<Coordinates | null>(null);
   const [buttonsVisible, setButtonsVisible] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [editingCommentIndex, setEditingCommentIndex] = useState<number | null>(null);
   const [blacklistedBuildingIds, setBlacklistedBuildingIds] = useState<Set<number>>(() => {
     // Load blacklisted IDs from localStorage
     if (typeof window !== 'undefined') {
@@ -341,8 +346,8 @@ function App() {
         ).then(enrichedBuildings => {
           // Remove from fetching set after completion
           enrichedBuildings.forEach(b => fetchingImagesRef.current.delete(b.id));
-          
-          // Update cache with enriched buildings
+        
+        // Update cache with enriched buildings
           setAllBaserowBuildings((prev) => {
             const updated = new Map(prev.map(b => [b.id, b]));
             enrichedBuildings.forEach(b => updated.set(b.id, b));
@@ -1915,20 +1920,53 @@ function App() {
                 setError(`Failed to ${newFavouriteStatus ? 'add' : 'remove'} favourite`);
               }
             }}
+            onAddComment={() => {
+              setEditingCommentIndex(null);
+              setShowCommentModal(true);
+            }}
+            onEditComment={(index) => {
+              setEditingCommentIndex(index);
+              setShowCommentModal(true);
+            }}
+            onDeleteComment={async (index) => {
+              if (!selectedBuilding) return;
+              
+              const rowIdMatch = selectedBuilding.id.match(/^baserow-(\d+)$/);
+              if (!rowIdMatch) {
+                setError('Cannot delete comment: Invalid building ID format');
+                return;
+              }
+              
+              const rowId = parseInt(rowIdMatch[1], 10);
+              
+              try {
+                setLoading(true);
+                const updatedBuilding = await deleteCommentFromBuilding(rowId, index);
+                setSelectedBuilding(updatedBuilding);
+                setBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                setAllBaserowBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                setStatusMessage('Comment deleted');
+              } catch (err) {
+                console.error('Failed to delete comment:', err);
+                setError('Failed to delete comment');
+              } finally {
+                setLoading(false);
+              }
+            }}
           />
         </Suspense>
       )}
 
       {/* The "N" Button - Bottom Left - Only show after intro completes */}
       {introState === 'complete' && (
-        <button
-          onClick={handleNButton}
-          className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 transition-all flex items-center justify-center group hover:scale-105"
-          title="The Architect"
-          aria-label="The Architect"
-        >
-          <Heart size={20} className="group-hover:scale-110 transition-all fill-current" style={{ color: '#FF5D88' }} aria-hidden="true" />
-        </button>
+      <button
+        onClick={handleNButton}
+        className="absolute bottom-4 md:bottom-6 left-4 md:left-6 z-10 w-14 h-14 transition-all flex items-center justify-center group hover:scale-105"
+        title="The Architect"
+        aria-label="The Architect"
+      >
+        <Heart size={20} className="group-hover:scale-110 transition-all fill-current" style={{ color: '#FF5D88' }} aria-hidden="true" />
+      </button>
       )}
 
 
@@ -1947,9 +1985,9 @@ function App() {
 
       {/* Footer text - only visible after intro completes */}
       {introState === 'complete' && (
-        <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center">
-          <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
-        </div>
+      <div className="absolute bottom-4 left-0 right-0 z-10 flex justify-center">
+        <p className={`${typography.body.sm} text-[#BAB2CF]`}>Anastasiia's Atlas with love from Nick</p>
+      </div>
       )}
 
       {/* Subtle force Gemini search button - bottom right (left of backfill) */}
@@ -2124,6 +2162,83 @@ function App() {
               setShowEditorModal(false);
               setEditingBuilding(null);
               setClickedCoordinates(null);
+            }}
+            theme={theme}
+          />
+        </Suspense>
+      )}
+
+      {/* Comment Modal */}
+      {showCommentModal && selectedBuilding && (
+        <Suspense fallback={null}>
+          <CommentModal
+            comment={editingCommentIndex !== null && selectedBuilding.comments ? selectedBuilding.comments[editingCommentIndex] : null}
+            onSave={async (text) => {
+              if (!selectedBuilding) return;
+              
+              const rowIdMatch = selectedBuilding.id.match(/^baserow-(\d+)$/);
+              if (!rowIdMatch) {
+                setError('Cannot save comment: Invalid building ID format');
+                return;
+              }
+              
+              const rowId = parseInt(rowIdMatch[1], 10);
+              
+              try {
+                setLoading(true);
+                let updatedBuilding: Building;
+                
+                if (editingCommentIndex !== null) {
+                  // Update existing comment
+                  updatedBuilding = await updateCommentInBuilding(rowId, editingCommentIndex, text);
+                } else {
+                  // Add new comment
+                  updatedBuilding = await addCommentToBuilding(rowId, text);
+                }
+                
+                setSelectedBuilding(updatedBuilding);
+                setBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                setAllBaserowBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                setShowCommentModal(false);
+                setEditingCommentIndex(null);
+                setStatusMessage(editingCommentIndex !== null ? 'Comment updated' : 'Comment added');
+              } catch (err) {
+                console.error('Failed to save comment:', err);
+                setError('Failed to save comment');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            onDelete={async () => {
+              if (!selectedBuilding || editingCommentIndex === null) return;
+              
+              const rowIdMatch = selectedBuilding.id.match(/^baserow-(\d+)$/);
+              if (!rowIdMatch) {
+                setError('Cannot delete comment: Invalid building ID format');
+                return;
+              }
+              
+              const rowId = parseInt(rowIdMatch[1], 10);
+              
+              try {
+                setLoading(true);
+                const updatedBuilding = await deleteCommentFromBuilding(rowId, editingCommentIndex);
+                setSelectedBuilding(updatedBuilding);
+                setBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                setAllBaserowBuildings((prev) => prev.map(b => b.id === selectedBuilding.id ? updatedBuilding : b));
+                setShowCommentModal(false);
+                setEditingCommentIndex(null);
+                setStatusMessage('Comment deleted');
+              } catch (err) {
+                console.error('Failed to delete comment:', err);
+                setError('Failed to delete comment');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            onCancel={() => {
+              setShowCommentModal(false);
+              setEditingCommentIndex(null);
             }}
             theme={theme}
           />

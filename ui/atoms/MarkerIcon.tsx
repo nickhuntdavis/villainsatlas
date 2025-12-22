@@ -29,7 +29,8 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
   
   if (isPalaceOfCulture) {
     // Extra large size for Palace of Culture - heart icon with subtle glow
-    size = isSelected ? 48 : 40;
+    // Increased to meet accessibility requirements (minimum 48px)
+    size = isSelected ? 56 : 48;
     animationClass = 'palace-pulse';
     const palaceColor = '#FF5D88'; // Same color as Nick
     const palaceGlowColor = hexToRgba(palaceColor, 0.2); // Very subtle glow
@@ -52,7 +53,8 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     `;
   } else if (variant === 'nick') {
     // Nick heart icon with subtle glow - bigger size
-    size = isSelected ? 40 : 36;
+    // Increased to meet accessibility requirements (minimum 48px)
+    size = isSelected ? 56 : 48;
     animationClass = 'nick-glow';
     const nickColor = '#FF5D88';
     const nickGlowColor = hexToRgba(nickColor, 0.3);
@@ -72,14 +74,13 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
-    // Red heart icon - smaller size for disgusting pins, no glow
-    size = isSelected ? 28 : 20;
+    // Red heart icon for disgusting pins - 56px
+    size = 56;
     // No animation or glow for disgusting pins
   } else if (isPrioritized) {
     // Prioritized buildings get subtle glow and are bigger (no bounce)
-    // 150% bigger: 28px -> 42px, 36px -> 54px
-    // Glow uses the pin's style color (not pink)
-    size = isSelected ? 54 : 42;
+    // 56px x 56px
+    size = 56;
     animationClass = 'prioritized-glow';
     const glowColor = hexToRgba(color, 0.3);
     glowStyle = `
@@ -98,7 +99,8 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else {
-    size = isSelected ? 32 : 24;
+    // Standard markers - 42px x 42px
+    size = 42;
   }
   
   let html: string;
@@ -165,14 +167,13 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     `;
   }
 
-  // Minimum touch target size for accessibility (48x48px)
+  // Ensure minimum 48px touch target for accessibility
+  // Visual size can be smaller, but touch target must be at least 48px
   const minTouchTarget = 48;
-  // Ensure icon size is at least the minimum touch target
   const touchTargetSize = Math.max(size, minTouchTarget);
-  // Calculate padding to center the visual icon within the touch target
   const padding = (touchTargetSize - size) / 2;
   
-  // Wrap the icon HTML in a container that ensures minimum touch target size
+  // Wrap the icon HTML in a container for proper spacing and accessibility
   const wrappedHtml = `
     <div style="
       width: ${touchTargetSize}px;
