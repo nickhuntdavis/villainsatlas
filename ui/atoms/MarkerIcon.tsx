@@ -165,11 +165,34 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     `;
   }
 
+  // Minimum touch target size for accessibility (48x48px)
+  const minTouchTarget = 48;
+  // Ensure icon size is at least the minimum touch target
+  const touchTargetSize = Math.max(size, minTouchTarget);
+  // Calculate padding to center the visual icon within the touch target
+  const padding = (touchTargetSize - size) / 2;
+  
+  // Wrap the icon HTML in a container that ensures minimum touch target size
+  const wrappedHtml = `
+    <div style="
+      width: ${touchTargetSize}px;
+      height: ${touchTargetSize}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: ${padding}px;
+      box-sizing: border-box;
+      cursor: pointer;
+    ">
+      ${html}
+    </div>
+  `;
+
   return divIcon({
-    html,
+    html: wrappedHtml,
     className: 'custom-marker', // dummy class to remove default styles
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    iconSize: [touchTargetSize, touchTargetSize],
+    iconAnchor: [touchTargetSize / 2, touchTargetSize / 2],
   });
 };
 

@@ -70,7 +70,7 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     ? `${building.name}, ${building.location}`
     : building.name;
 
-  // Ref callback to access the Leaflet marker instance
+  // Ref callback to access the Leaflet marker instance and set accessibility attributes
   const markerRefCallback = (markerInstance: L.Marker | null) => {
     if (markerInstance) {
       const markerElement = markerInstance.getElement();
@@ -81,24 +81,12 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
           iconElement.setAttribute('aria-label', markerLabel);
           iconElement.setAttribute('title', markerLabel);
           iconElement.setAttribute('role', 'button');
-          
-          // Ensure minimum touch target size (48x48px) for mobile accessibility
-          const currentWidth = iconElement.offsetWidth || 24;
-          const currentHeight = iconElement.offsetHeight || 24;
-          const minSize = 48;
-          
-          if (currentWidth < minSize || currentHeight < minSize) {
-            // Add padding to increase touch target to at least 48px
-            const paddingX = Math.max(0, (minSize - currentWidth) / 2);
-            const paddingY = Math.max(0, (minSize - currentHeight) / 2);
-            iconElement.style.padding = `${paddingY}px ${paddingX}px`;
-            iconElement.style.minWidth = `${minSize}px`;
-            iconElement.style.minHeight = `${minSize}px`;
-            iconElement.style.display = 'flex';
-            iconElement.style.alignItems = 'center';
-            iconElement.style.justifyContent = 'center';
-            iconElement.style.boxSizing = 'border-box';
-          }
+          // Ensure the icon element itself has proper touch target styling
+          iconElement.style.minWidth = '48px';
+          iconElement.style.minHeight = '48px';
+          iconElement.style.display = 'flex';
+          iconElement.style.alignItems = 'center';
+          iconElement.style.justifyContent = 'center';
         }
       }
     }

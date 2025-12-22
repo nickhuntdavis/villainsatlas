@@ -153,6 +153,23 @@
       .animate-pulse-radar {
         animation: pulse-radar 3s cubic-bezier(0, 0, 0.2, 1) infinite;
       }
+      /* Ensure map markers have proper touch target sizes for accessibility */
+      .leaflet-marker-icon.custom-marker {
+        min-width: 48px !important;
+        min-height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer;
+        /* Ensure proper spacing between markers (8px minimum) */
+        margin: 4px;
+      }
+      /* Ensure the inner content is properly centered */
+      .leaflet-marker-icon.custom-marker > div {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
     </style>
 </head>
   <body class="bg-black text-[#fafafa] antialiased overflow-hidden">
