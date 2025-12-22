@@ -167,7 +167,7 @@ export const CommentModal: React.FC<CommentModalProps> = ({
                 className="px-6 py-3 rounded-md transition-colors bg-[#FF5D88] text-white hover:opacity-90 font-medium"
               >
                 <Trash2 size={16} className="inline mr-2" />
-                Delete
+                Remove Comment
               </button>
             )}
             <button

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building, Coordinates, Comment } from '../types';
-import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark, MessageSquare, Edit2, Trash2 } from 'lucide-react';
+import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark, MessageSquare } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 import { ImageGallery } from './ImageGallery';
@@ -168,7 +168,6 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
         {/* Comments Section */}
         {building.comments && building.comments.length > 0 && (
           <div className="mb-8">
-            <h3 className={`${typography.label.heading} text-white mb-4`}>Comments</h3>
             <div className="space-y-4">
               {building.comments.map((comment, index) => {
                 const date = new Date(comment.createdAt);
@@ -181,40 +180,18 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                 });
                 
                 return (
-                  <div key={index} className="bg-[#1A1D3A] rounded-lg p-4 border border-[#BAB2CF]/20">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div 
-                          className="text-white text-sm leading-relaxed"
-                          dangerouslySetInnerHTML={{ __html: comment.text }}
-                        />
-                      </div>
-                      {(onEditComment || onDeleteComment) && (
-                        <div className="flex gap-2 ml-4">
-                          {onEditComment && (
-                            <button
-                              onClick={() => onEditComment(index)}
-                              className="p-1.5 hover:bg-[#3A3F6B] rounded transition-colors"
-                              title="Edit comment"
-                              aria-label="Edit comment"
-                            >
-                              <Edit2 size={14} className="text-[#BAB2CF]" />
-                            </button>
-                          )}
-                          {onDeleteComment && (
-                            <button
-                              onClick={() => onDeleteComment(index)}
-                              className="p-1.5 hover:bg-[#3A3F6B] rounded transition-colors"
-                              title="Delete comment"
-                              aria-label="Delete comment"
-                            >
-                              <Trash2 size={14} className="text-[#FF5D88]" />
-                            </button>
-                          )}
-                        </div>
-                      )}
+                  <div 
+                    key={index} 
+                    onClick={() => onEditComment && onEditComment(index)}
+                    className={`bg-[#1A1D3A]/40 rounded-[16px] p-4 cursor-pointer hover:bg-[#1A1D3A]/50 transition-colors ${onEditComment ? '' : 'cursor-default'}`}
+                  >
+                    <div className="mb-2">
+                      <div 
+                        className="text-white text-sm leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: comment.text }}
+                      />
                     </div>
-                    <div className="text-[#BAB2CF] text-xs mt-2">
+                    <div className="text-[#BAB2CF] text-[10px] mt-2">
                       {formattedDate}
                       {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
                         <span className="ml-2">(edited)</span>
