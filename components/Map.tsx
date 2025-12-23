@@ -10,8 +10,16 @@ import { getThemeColors } from '../ui/theme';
 const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
   const map = useMap();
   const lastCenterRef = useRef<Coordinates | null>(null);
+  const isInitialMountRef = useRef(true);
   
   useEffect(() => {
+    // Skip on initial mount - let MapContainer handle initial positioning
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      lastCenterRef.current = center;
+      return;
+    }
+    
     const currentCenter = map.getCenter();
     const currentCoords = { lat: currentCenter.lat, lng: currentCenter.lng };
     
@@ -189,6 +197,7 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
   const isDark = theme === 'dark';
   const colors = getThemeColors(theme);
   const [showUserLocation, setShowUserLocation] = useState(true);
+  const initialCenterRef = useRef<Coordinates>(center);
   
   // Auto-hide user location indicator after 10 seconds
   useEffect(() => {
@@ -203,7 +212,7 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
 
   return (
     <MapContainer
-      center={[center.lat, center.lng]}
+      center={[initialCenterRef.current.lat, initialCenterRef.current.lng]}
       zoom={DEFAULT_ZOOM}
       scrollWheelZoom={true}
       zoomControl={false} // We'll add it manually to style or position it if needed

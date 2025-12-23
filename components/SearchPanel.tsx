@@ -168,11 +168,19 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     };
   }, [query, filterSuggestions]);
 
-  // Hide suggestions when search is submitted or loading
+  // Track previous loading state to detect when search completes
+  const prevLoadingRef = useRef(isLoading);
+  
+  // Hide suggestions when search is submitted, loading, or completed
   useEffect(() => {
     if (isLoading) {
       setShowSuggestions(false);
+    } else if (prevLoadingRef.current && !isLoading) {
+      // Search just completed - hide suggestions if they weren't chosen
+      setShowSuggestions(false);
+      setSuggestions([]);
     }
+    prevLoadingRef.current = isLoading;
   }, [isLoading]);
 
   // Handle click outside to close suggestions
