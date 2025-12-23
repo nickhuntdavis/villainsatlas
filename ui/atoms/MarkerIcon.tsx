@@ -7,14 +7,15 @@ export interface MarkerIconProps {
   variant?: 'standard' | 'nick' | 'purpleHeart'; // 'nick' = red heart icon, 'purpleHeart' = purple heart icon
   isPrioritized?: boolean; // Prioritized buildings get glow and bounce
   isPalaceOfCulture?: boolean; // Palace of Culture gets special treatment
+  zoom?: number; // Current zoom level for dynamic sizing
 }
 
 /**
  * Creates a Leaflet divIcon for building markers
  * This is used by BuildingMarker component
  */
-export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPrioritized = false, isPalaceOfCulture = false, hasPurpleHeart = false }: MarkerIconProps & { hasPurpleHeart?: boolean }) => {
-  let size: number;
+export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPrioritized = false, isPalaceOfCulture = false, hasPurpleHeart = false, zoom = 13 }: MarkerIconProps & { hasPurpleHeart?: boolean }) => {
+  let baseSize: number;
   let animationClass = '';
   let glowStyle = '';
   let sparkleStyle = '';
@@ -27,10 +28,28 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
   
+  // Helper function to calculate size based on zoom level
+  // Minimum size is 28px, scales up from zoom 0 to zoom 13+
+  const calculateSize = (baseSize: number, zoom: number): number => {
+    const MIN_SIZE = 28;
+    const MIN_ZOOM = 0;
+    const MAX_ZOOM = 13; // Full size at zoom 13 and above
+    
+    if (zoom >= MAX_ZOOM) {
+      return baseSize;
+    }
+    
+    // Linear interpolation: size scales from MIN_SIZE at MIN_ZOOM to baseSize at MAX_ZOOM
+    const zoomRatio = Math.max(0, Math.min(1, (zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)));
+    const scaledSize = MIN_SIZE + (baseSize - MIN_SIZE) * zoomRatio;
+    
+    return Math.max(MIN_SIZE, Math.round(scaledSize));
+  };
+  
   if (isPalaceOfCulture) {
     // Extra large size for Palace of Culture - heart icon with subtle glow
     // Increased to meet accessibility requirements (minimum 48px)
-    size = isSelected ? 56 : 48;
+    baseSize = isSelected ? 56 : 48;
     animationClass = 'palace-pulse';
     const palaceColor = '#FF5D88'; // Same color as Nick
     const palaceGlowColor = hexToRgba(palaceColor, 0.2); // Very subtle glow
@@ -54,7 +73,7 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
   } else if (variant === 'nick') {
     // Nick heart icon with subtle glow - bigger size
     // Increased to meet accessibility requirements (minimum 48px)
-    size = isSelected ? 56 : 48;
+    baseSize = isSelected ? 56 : 48;
     animationClass = 'nick-glow';
     const nickColor = '#FF5D88';
     const nickGlowColor = hexToRgba(nickColor, 0.3);
@@ -75,12 +94,12 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     `;
   } else if (variant === 'purpleHeart' || hasPurpleHeart) {
     // Red heart icon for disgusting pins - 56px
-    size = 56;
+    baseSize = 56;
     // No animation or glow for disgusting pins
   } else if (isPrioritized) {
     // Prioritized buildings get subtle glow and are bigger (no bounce)
     // 56px x 56px
-    size = 56;
+    baseSize = 56;
     animationClass = 'prioritized-glow';
     const glowColor = hexToRgba(color, 0.3);
     glowStyle = `
@@ -100,8 +119,11 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     `;
   } else {
     // Standard markers - 42px x 42px
-    size = 42;
+    baseSize = 42;
   }
+  
+  // Calculate actual size based on zoom level (minimum 28px)
+  const size = calculateSize(baseSize, zoom);
   
   let html: string;
   

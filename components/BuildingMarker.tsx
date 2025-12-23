@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { Marker, Popup, useMap } from 'react-leaflet';
+import React, { useRef, useEffect, useState } from 'react';
+import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { Building, ArchitecturalStyle } from '../types';
 import { getPrimaryStyleColor } from '../constants';
 import { createMarkerIcon } from '../ui/atoms/MarkerIcon';
@@ -15,6 +15,17 @@ interface BuildingMarkerProps {
 
 export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSelected, onSelect, onTripleClick, adminModeEnabled = false, onEdit }) => {
   const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  
+  // Track zoom level changes
+  useMapEvents({
+    zoomend: () => {
+      setZoom(map.getZoom());
+    },
+    zoom: () => {
+      setZoom(map.getZoom());
+    },
+  });
   
   // Check if this is Nick - show red heart icon
   const isNick = building.name === "Nick";
@@ -61,6 +72,7 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     isPrioritized: building.isPrioritized && !isPalaceOfCulture && !building.hasPurpleHeart && !isDisgusting,
     isPalaceOfCulture: isPalaceOfCulture,
     hasPurpleHeart: building.hasPurpleHeart || isDisgusting || false,
+    zoom: zoom,
   });
 
   // Create accessible label for the marker
@@ -94,6 +106,7 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
 
   return (
     <Marker
+      key={`${building.id}-zoom-${Math.floor(zoom)}`}
       ref={markerRefCallback}
       position={[building.coordinates.lat, building.coordinates.lng]}
       icon={icon}
