@@ -11,6 +11,7 @@ const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
   const map = useMap();
   const lastCenterRef = useRef<Coordinates | null>(null);
   const isInitialMountRef = useRef(true);
+  const flyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     // Skip on initial mount - let MapContainer handle initial positioning
@@ -20,8 +21,10 @@ const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
       return;
     }
     
-    const currentCenter = map.getCenter();
-    const currentCoords = { lat: currentCenter.lat, lng: currentCenter.lng };
+    // Clear any pending fly operations
+    if (flyTimeoutRef.current) {
+      clearTimeout(flyTimeoutRef.current);
+    }
     
     // Only fly if center has changed significantly (more than 100 meters)
     // This prevents jumping back when center is set to the same or very similar location
@@ -30,9 +33,22 @@ const MapUpdater: React.FC<{ center: Coordinates }> = ({ center }) => {
       Math.abs(center.lng - lastCenterRef.current.lng) > 0.001;
     
     if (shouldFly) {
-      map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 2 });
+      // Update last center immediately to prevent duplicate calls
       lastCenterRef.current = center;
+      
+      // Use a small timeout to debounce rapid center changes
+      flyTimeoutRef.current = setTimeout(() => {
+        map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 2 });
+        flyTimeoutRef.current = null;
+      }, 50);
     }
+    
+    return () => {
+      if (flyTimeoutRef.current) {
+        clearTimeout(flyTimeoutRef.current);
+        flyTimeoutRef.current = null;
+      }
+    };
   }, [center, map]);
   return null;
 };
@@ -197,7 +213,11 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
   const isDark = theme === 'dark';
   const colors = getThemeColors(theme);
   const [showUserLocation, setShowUserLocation] = useState(true);
-  const initialCenterRef = useRef<Coordinates>(center);
+  // Store initial center only once using lazy initializer - never update it after mount
+  const initialCenterRef = useRef<Coordinates | null>(null);
+  if (initialCenterRef.current === null) {
+    initialCenterRef.current = center;
+  }
   
   // Auto-hide user location indicator after 10 seconds
   useEffect(() => {
@@ -212,7 +232,8 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
 
   return (
     <MapContainer
-      center={[initialCenterRef.current.lat, initialCenterRef.current.lng]}
+      key="map-container" // Stable key prevents remounting
+      center={initialCenterRef.current ? [initialCenterRef.current.lat, initialCenterRef.current.lng] : [center.lat, center.lng]}
       zoom={DEFAULT_ZOOM}
       scrollWheelZoom={true}
       zoomControl={false} // We'll add it manually to style or position it if needed

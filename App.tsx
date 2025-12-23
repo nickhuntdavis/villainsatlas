@@ -44,11 +44,7 @@ function App() {
   const [backgroundLoading, setBackgroundLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [introState, setIntroState] = useState<'intro' | 'complete'>(() => {
-    // Check if user has already completed intro
-    if (typeof window !== 'undefined') {
-      const introCompleted = window.localStorage.getItem('evil-atlas-intro-completed');
-      return introCompleted === 'true' ? 'complete' : 'intro';
-    }
+    // Always show intro on new visit - don't check localStorage
     return 'intro';
   });
   const [firstLoad, setFirstLoad] = useState(true); // Keep for backward compatibility
@@ -372,16 +368,22 @@ function App() {
     [allBaserowBuildings, filterBlacklistedBuildings, isInBoundingBox]
   );
 
+  // Track if user has manually moved the map (via search) to prevent auto-centering
+  const userHasSearchedRef = useRef(false);
+  
   // Function to load user location and nearby buildings
   // Defined as useCallback so it always has access to latest getBaserowBuildingsNear
-  const loadUserLocationAndBuildings = useCallback(() => {
+  const loadUserLocationAndBuildings = useCallback((shouldSetCenter: boolean = true) => {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return;
     
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         const newCenter: Coordinates = { lat: latitude, lng: longitude };
-        setCenter(newCenter);
+        // Only set center if user hasn't searched yet, or if explicitly requested
+        if (shouldSetCenter && !userHasSearchedRef.current) {
+          setCenter(newCenter);
+        }
         setUserLocation(newCenter);
 
         try {
@@ -419,9 +421,15 @@ function App() {
     );
   }, [getBaserowBuildingsNear]);
 
-  // On load: if geolocation permission is already granted, move map to user location
-  // and preload nearby Baserow buildings in the background (without touching the intro UI).
+  // Track if we've already attempted to load user location on initial mount
+  const hasLoadedUserLocationRef = useRef(false);
+  
+  // On load: if geolocation permission is already granted, load user location and nearby buildings
+  // but don't move map if user has already searched (to prevent jumping back)
   useEffect(() => {
+    // Only run once on mount
+    if (hasLoadedUserLocationRef.current) return;
+    
     if (typeof navigator === 'undefined' || typeof window === 'undefined') return;
     if (!('geolocation' in navigator)) return;
 
@@ -434,7 +442,9 @@ function App() {
           .query({ name: 'geolocation' as PermissionName })
           .then((result: PermissionStatus) => {
             if (result.state === 'granted') {
-              loadUserLocationAndBuildings();
+              hasLoadedUserLocationRef.current = true;
+              // Only set center on initial load if user hasn't searched yet
+              loadUserLocationAndBuildings(!userHasSearchedRef.current);
             }
           })
           .catch(() => {
@@ -444,7 +454,7 @@ function App() {
         // Fallback: do nothing; explicit user actions will still work
       }
     }
-  }, [loadUserLocationAndBuildings]);
+  }, []); // Empty deps - only run once on mount
 
   // Clear status message shortly after search completes
   useEffect(() => {
@@ -637,10 +647,7 @@ function App() {
   const handleStartScan = useCallback(() => {
     setIntroState('complete');
     setFirstLoad(false);
-    // Remember that user has completed intro
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('evil-atlas-intro-completed', 'true');
-    }
+    // Don't save to localStorage - show intro on every visit
   }, []);
 
   const handleLocateMe = useCallback(() => {
@@ -971,11 +978,25 @@ function App() {
           // Matches criteria - add it automatically
           const enrichedBuilding = styleCheck.building;
           
+          // Filter out graveyards without images - they must have an image to be added
+          const isGraveyard = enrichedBuilding.style && (
+            enrichedBuilding.style.toString().toLowerCase().includes('graveyard') || 
+            enrichedBuilding.style.toString().toLowerCase().includes('cemetery')
+          );
+          
+          if (isGraveyard && !enrichedBuilding.imageUrl) {
+            console.log(`⚠️ Skipping graveyard "${enrichedBuilding.name}" - no image available`);
+            setLoading(false);
+            setError(`Found "${enrichedBuilding.name}" but it doesn't have an image. Graveyards require images to be added.`);
+            return;
+          }
+          
                 // Check if it already exists in Baserow
                 const existing = await fetchBuildingByName(enrichedBuilding.name);
                 if (existing) {
                   // Already exists - just show it
                   setBuildings((prev) => mergeBuildings(prev, [existing]));
+            userHasSearchedRef.current = true; // Mark that user has searched
             setCenter(enrichedBuilding.coordinates);
             setLoading(false);
             setStatusMessage(`Found "${enrichedBuilding.name}" in database`);
@@ -989,6 +1010,7 @@ function App() {
             
             // Add to map
             setBuildings((prev) => mergeBuildings(prev, [savedBuilding]));
+            userHasSearchedRef.current = true; // Mark that user has searched
             setCenter(savedBuilding.coordinates);
             setLoading(false);
             setStatusMessage(`Added "${savedBuilding.name}" to database`);
@@ -1010,6 +1032,7 @@ function App() {
       
       if (geocodedCoords) {
         // Move map to geocoded location
+        userHasSearchedRef.current = true; // Mark that user has searched
         setCenter(geocodedCoords);
         // Wait a bit for map to move (500ms)
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -1277,6 +1300,7 @@ function App() {
         setStatusMessage(statusMsg);
       }
       if (sortedResults.length > 0) {
+        userHasSearchedRef.current = true; // Mark that user has searched
         setCenter(center);
       } else {
         setError("Nothing ominous here. Try searching for a major city or zoom out and use 'Search Area'.");
@@ -1824,39 +1848,6 @@ function App() {
         statusMessage={statusMessage}
         theme={theme}
         isSidebarOpen={!!selectedBuilding}
-        allBuildings={allBaserowBuildings}
-        onSelectBuilding={async (building) => {
-          setSelectedBuilding(building);
-          setCenter(building.coordinates);
-          
-          // Load nearby Baserow buildings so pins are visible
-          try {
-            setBackgroundLoading(true);
-            const nearbyBuildings = await getBaserowBuildingsNear(building.coordinates, 50000); // 50km radius
-            console.log(`Found ${nearbyBuildings.length} nearby buildings for autosuggest selection`);
-            
-            // Ensure the selected building is included in results
-            const buildingsToShow = nearbyBuildings.some(b => b.id === building.id)
-              ? nearbyBuildings
-              : [...nearbyBuildings, building];
-            
-            // Sort results: prioritized buildings first
-            const sortedResults = buildingsToShow.sort((a, b) => {
-              if (a.isPrioritized && !b.isPrioritized) return -1;
-              if (!a.isPrioritized && b.isPrioritized) return 1;
-              return 0;
-            });
-            
-            // Merge with existing buildings
-            setBuildings((prev) => mergeBuildings(prev, sortedResults));
-          } catch (err) {
-            console.error("Error loading nearby buildings for autosuggest selection:", err);
-            // Still show the selected building even if loading nearby fails
-            setBuildings((prev) => mergeBuildings(prev, [building]));
-          } finally {
-            setBackgroundLoading(false);
-          }
-        }}
         />
       )}
       {introState === 'complete' && (

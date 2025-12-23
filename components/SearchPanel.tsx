@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { SurfaceCard, StatusStrip } from '../ui/atoms';
 import { typography, getThemeColors } from '../ui/theme';
-import { Building } from '../types';
 
 interface SearchPanelProps {
   onSearch: (query: string) => void;
@@ -11,8 +10,6 @@ interface SearchPanelProps {
   statusMessage?: string | null;
   theme: 'dark' | 'light';
   isSidebarOpen?: boolean;
-  allBuildings?: Building[];
-  onSelectBuilding?: (building: Building) => void;
 }
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({
@@ -22,18 +19,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   statusMessage,
   theme,
   isSidebarOpen = false,
-  allBuildings = [],
-  onSelectBuilding,
 }) => {
   const [query, setQuery] = useState('');
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [shuffledMessages, setShuffledMessages] = useState<string[]>([]);
-  const [suggestions, setSuggestions] = useState<Building[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [showKeyboardHint, setShowKeyboardHint] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
   // All loading messages
@@ -102,112 +91,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, searchStatus, shuffledMessages.length]);
 
-  // Check if keyboard hint has been shown before
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hintSeen = window.localStorage.getItem('evil-atlas-autosuggest-hint-seen');
-      if (!hintSeen) {
-        setShowKeyboardHint(true);
-      }
-    }
-  }, []);
-
-  // Debounced filtering function for autosuggest
-  const filterSuggestions = useCallback((searchQuery: string) => {
-    if (searchQuery.length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const normalizedQuery = searchQuery.toLowerCase().trim();
-    const filtered = allBuildings
-      .filter((building) => {
-        // Only show buildings with a name field
-        if (!building.name || building.name.trim() === '') {
-          return false;
-        }
-        // Case-insensitive search
-        return building.name.toLowerCase().includes(normalizedQuery);
-      })
-      .slice(0, 5); // Limit to 5 results
-
-    setSuggestions(filtered);
-    setShowSuggestions(filtered.length > 0);
-    setSelectedIndex(-1);
-    
-    // Show keyboard hint on first autosuggest interaction
-    if (filtered.length > 0 && showKeyboardHint && typeof window !== 'undefined') {
-      const hintSeen = window.localStorage.getItem('evil-atlas-autosuggest-hint-seen');
-      if (!hintSeen) {
-        // Hide hint after 5 seconds
-        setTimeout(() => {
-          setShowKeyboardHint(false);
-          window.localStorage.setItem('evil-atlas-autosuggest-hint-seen', 'true');
-        }, 5000);
-      } else {
-        setShowKeyboardHint(false);
-      }
-    }
-  }, [allBuildings, showKeyboardHint]);
-
-  // Debounce the filtering
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      filterSuggestions(query);
-    }, 300);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [query, filterSuggestions]);
-
-  // Track previous loading state to detect when search completes
-  const prevLoadingRef = useRef(isLoading);
-  
-  // Hide suggestions when search is submitted, loading, or completed
-  useEffect(() => {
-    if (isLoading) {
-      setShowSuggestions(false);
-    } else if (prevLoadingRef.current && !isLoading) {
-      // Search just completed - hide suggestions if they weren't chosen
-      setShowSuggestions(false);
-      setSuggestions([]);
-    }
-    prevLoadingRef.current = isLoading;
-  }, [isLoading]);
-
-  // Handle click outside to close suggestions
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-
-    if (showSuggestions) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [showSuggestions]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      setShowSuggestions(false);
       onSearch(query);
     }
   };
@@ -216,49 +103,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     setQuery(e.target.value);
   };
 
-  const handleSelectSuggestion = (building: Building) => {
-    setQuery('');
-    setShowSuggestions(false);
-    setSuggestions([]);
-    if (onSelectBuilding) {
-      onSelectBuilding(building);
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggestions || suggestions.length === 0) {
-      if (e.key === 'Enter') {
-        handleSubmit(e as any);
-      }
-      return;
-    }
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex((prev) => 
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-          handleSelectSuggestion(suggestions[selectedIndex]);
-        }
-        break;
-      case 'Escape':
-        e.preventDefault();
-        setShowSuggestions(false);
-        setSelectedIndex(-1);
-        break;
-      case 'Tab':
-        setShowSuggestions(false);
-        setSelectedIndex(-1);
-        break;
+    if (e.key === 'Enter') {
+      handleSubmit(e as any);
     }
   };
 
@@ -297,13 +144,8 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               fontFamily: 'Inter, sans-serif',
               fontWeight: 500
             }}
-            role="combobox"
+            role="searchbox"
             aria-label="Search for buildings"
-            aria-autocomplete="list"
-            aria-expanded={showSuggestions}
-            aria-controls="suggestions-list"
-            aria-haspopup="listbox"
-            aria-activedescendant={selectedIndex >= 0 ? `suggestion-${suggestions[selectedIndex]?.id}` : undefined}
           />
           
           <button
@@ -319,102 +161,6 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             )}
           </button>
         </div>
-        
-        {/* Keyboard Navigation Hint */}
-        {showSuggestions && suggestions.length > 0 && showKeyboardHint && (
-          <div className="absolute top-full left-0 right-0 mt-1 px-4 py-1.5 pointer-events-none z-45">
-            <p 
-              className="text-[#AA8BFF]/60 text-xs"
-              style={{
-                fontSize: '11px',
-                fontFamily: 'Inter, sans-serif'
-              }}
-            >
-              Use ↑↓ to navigate, Enter to select
-            </p>
-          </div>
-        )}
-
-        {/* Autosuggest Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div
-            ref={suggestionsRef}
-            id="suggestions-list"
-            className="absolute top-full left-0 right-0 mt-1 bg-[#282C55] rounded-[10px] shadow-lg border border-[#3A3F6B] overflow-hidden z-50"
-            style={{
-              marginTop: showKeyboardHint ? '2.5rem' : '0.25rem',
-              boxShadow: '0px 4px 20px 0px rgba(1,10,36,0.4)',
-              maxHeight: '300px',
-              overflowY: 'auto'
-            }}
-            role="listbox"
-            aria-label="Building suggestions"
-          >
-            {suggestions.map((building, index) => {
-              const locationText = building.city && building.country
-                ? `${building.city}, ${building.country}`
-                : building.location || 'Unknown Location';
-              
-              // Extract first style if comma-separated
-              const firstStyle = building.style ? building.style.split(',')[0].trim() : null;
-              const countryCode = building.country || null;
-              
-              return (
-                <button
-                  key={building.id}
-                  type="button"
-                  onClick={() => handleSelectSuggestion(building)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full text-left px-4 py-3 transition-colors ${
-                    selectedIndex === index
-                      ? 'bg-[#3A3F6B] text-white'
-                      : 'bg-[#282C55] text-white hover:bg-[#3A3F6B]'
-                  }`}
-                  role="option"
-                  aria-selected={selectedIndex === index}
-                  id={`suggestion-${building.id}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div 
-                        className="font-medium text-white truncate"
-                        style={{ 
-                          fontSize: '16px',
-                          fontFamily: 'Inter, sans-serif',
-                          fontWeight: 500
-                        }}
-                      >
-                        {building.name}
-                      </div>
-                      <div 
-                        className="text-[#BAB2CF] text-sm truncate mt-0.5"
-                        style={{ 
-                          fontSize: '14px',
-                          fontFamily: 'Inter, sans-serif'
-                        }}
-                      >
-                        {locationText}
-                      </div>
-                    </div>
-                    {(firstStyle || countryCode) && (
-                      <div 
-                        className="text-[#AA8BFF]/60 text-xs whitespace-nowrap flex items-center gap-1.5"
-                        style={{ 
-                          fontSize: '12px',
-                          fontFamily: 'Inter, sans-serif'
-                        }}
-                      >
-                        {firstStyle && <span>{firstStyle}</span>}
-                        {firstStyle && countryCode && <span>·</span>}
-                        {countryCode && <span>{countryCode}</span>}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </form>
       
       {/* Loading Status Text */}

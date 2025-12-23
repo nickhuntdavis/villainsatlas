@@ -123,12 +123,17 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     3. AESTHETIC: Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING. Think buildings that look like supervillain headquarters, dystopian government facilities, or dark citadels.
     4. RARITY: These are exceptional, noteworthy buildings. If a city has 5-8 qualifying buildings, you're being too lenient. Most cities will have 0-3 at most.
     
-    PRIORITY 3 - FAMOUS GRAVEYARDS & CEMETERIES:
-    - Search for epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited by tourists and locals.
-    - Examples: Père Lachaise Cemetery (Paris), Highgate Cemetery (London), La Recoleta Cemetery (Buenos Aires), Arlington National Cemetery (Virginia), Mount Auburn Cemetery (Massachusetts), Green-Wood Cemetery (Brooklyn), Old Jewish Cemetery (Prague), St. Louis Cemetery (New Orleans), Bonaventure Cemetery (Savannah), Forest Lawn Memorial Park (Los Angeles).
-    - Must be substantial in size, architecturally impressive, historically significant, and well-known enough that visitors commonly seek them out.
-    - Mark these with an appropriate architectural style (often "Gothic Revival", "Victorian Gothic", "Monumental", or "Cemetery").
-    - These should be included even if slightly less "evil" - their historical significance and imposing scale qualify them.
+    PRIORITY 3 - WORLD-CLASS GRAVEYARDS & CEMETERIES:
+    - ONLY search for the most exceptional, world-renowned graveyards/cemeteries that are internationally famous landmarks.
+    - Must meet ALL of these criteria:
+      1. HISTORICAL SIGNIFICANCE: Must be historically significant with notable burials, cultural importance, or architectural heritage recognized globally.
+      2. ARCHITECTURAL BEAUTY: Must be architecturally stunning with impressive monuments, mausoleums, sculptures, or landscape design that is visually remarkable and photogenic.
+      3. INTERNATIONAL FAME: Must be well-known internationally, appearing in travel guides, documentaries, or cultural references. Not just locally known.
+      4. VISITOR DESTINATION: Must be a major tourist destination that people specifically travel to visit, not just a local cemetery.
+    - Examples of the caliber required: Père Lachaise Cemetery (Paris), Highgate Cemetery (London), La Recoleta Cemetery (Buenos Aires), Arlington National Cemetery (Virginia), Mount Auburn Cemetery (Massachusetts), Green-Wood Cemetery (Brooklyn), Old Jewish Cemetery (Prague), St. Louis Cemetery (New Orleans), Bonaventure Cemetery (Savannah).
+    - REJECT: Ordinary cemeteries, small local graveyards, modern memorial parks without architectural distinction, or any cemetery that doesn't meet ALL criteria above.
+    - CRITICAL: Mark these with the architectural style "Graveyard" (not "Cemetery" or other styles).
+    - These should be included even if slightly less "evil" - their historical significance, architectural beauty, and imposing scale qualify them.
     
     REJECT IF:
     - Building is small or medium-sized (only large-scale structures)
@@ -162,7 +167,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
   SEARCH PRIORITY:
   1. FIRST: Search for historically significant Art Deco buildings by well-known architects (e.g., Empire State Building, Chrysler Building, Rockefeller Center). Include these even if slightly less extreme - they are prioritized.
   2. THEN: Search for other extreme, large-scale, imposing buildings.
-  3. ALSO: Search for epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited (e.g., Père Lachaise, Highgate Cemetery, La Recoleta, Arlington National Cemetery). These should be substantial, architecturally impressive, and well-known enough that visitors commonly seek them out.
+  3. ALSO: Search ONLY for world-class, internationally famous graveyards/cemeteries that are major tourist destinations with exceptional architectural beauty and historical significance (e.g., Père Lachaise, Highgate Cemetery, La Recoleta, Arlington National Cemetery). These must be architecturally stunning landmarks, not ordinary cemeteries.
   
   QUALITY STANDARD: These should be rare, exceptional examples. Most cities will have 0-3 qualifying buildings at most. If you find more than 5, you're being too lenient - only include the MOST extreme examples.
   
@@ -481,6 +486,33 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
       }
     }
 
+    // Filter out graveyards without images - they must have an image to be added
+    const graveyardsWithoutImages = filteredBuildings.filter(b => {
+      const isGraveyard = b.style && (
+        b.style.toString().toLowerCase().includes('graveyard') || 
+        b.style.toString().toLowerCase().includes('cemetery')
+      );
+      return isGraveyard && !b.imageUrl;
+    });
+    
+    if (graveyardsWithoutImages.length > 0) {
+      console.log(`⚠️ Filtered out ${graveyardsWithoutImages.length} graveyard(s) without images:`, 
+        graveyardsWithoutImages.map(b => b.name));
+    }
+    
+    // Remove graveyards without images from the list to be saved
+    const buildingsToSave = filteredBuildings.filter(b => {
+      const isGraveyard = b.style && (
+        b.style.toString().toLowerCase().includes('graveyard') || 
+        b.style.toString().toLowerCase().includes('cemetery')
+      );
+      // If it's a graveyard, it must have an image; otherwise include it
+      return !isGraveyard || !!b.imageUrl;
+    });
+    
+    // Also filter from the returned results (for display)
+    filteredBuildings = buildingsToSave;
+
     // Debug: Log building data for troubleshooting
     filteredBuildings.forEach((b, idx) => {
         console.log(`Building ${idx + 1} (${b.name}):`, {
@@ -495,7 +527,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     // Save new buildings to Baserow if they don't already exist (async, don't wait)
     // Use Promise.allSettled to handle all saves without blocking, but track results
     Promise.allSettled(
-      filteredBuildings.map(async (building) => {
+      buildingsToSave.map(async (building) => {
         try {
           const existing = await findExistingBuilding(building);
           if (!existing.exists) {
@@ -852,12 +884,17 @@ export const checkPOIStyleCriteria = async (building: Building): Promise<{ match
     3. AESTHETIC: Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING. Think buildings that look like supervillain headquarters, dystopian government facilities, or dark citadels.
     4. RARITY: These are exceptional, noteworthy buildings.
     
-    PRIORITY 3 - FAMOUS GRAVEYARDS & CEMETERIES:
-    - Epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited by tourists and locals.
-    - Examples: Père Lachaise Cemetery (Paris), Highgate Cemetery (London), La Recoleta Cemetery (Buenos Aires), Arlington National Cemetery (Virginia), Mount Auburn Cemetery (Massachusetts), Green-Wood Cemetery (Brooklyn), Old Jewish Cemetery (Prague), St. Louis Cemetery (New Orleans), Bonaventure Cemetery (Savannah), Forest Lawn Memorial Park (Los Angeles).
-    - Must be substantial in size, architecturally impressive, historically significant, and well-known enough that visitors commonly seek them out.
+    PRIORITY 3 - WORLD-CLASS GRAVEYARDS & CEMETERIES:
+    - ONLY consider the most exceptional, world-renowned graveyards/cemeteries that are internationally famous landmarks.
+    - Must meet ALL of these criteria:
+      1. HISTORICAL SIGNIFICANCE: Must be historically significant with notable burials, cultural importance, or architectural heritage recognized globally.
+      2. ARCHITECTURAL BEAUTY: Must be architecturally stunning with impressive monuments, mausoleums, sculptures, or landscape design that is visually remarkable and photogenic.
+      3. INTERNATIONAL FAME: Must be well-known internationally, appearing in travel guides, documentaries, or cultural references. Not just locally known.
+      4. VISITOR DESTINATION: Must be a major tourist destination that people specifically travel to visit, not just a local cemetery.
+    - Examples of the caliber required: Père Lachaise Cemetery (Paris), Highgate Cemetery (London), La Recoleta Cemetery (Buenos Aires), Arlington National Cemetery (Virginia), Mount Auburn Cemetery (Massachusetts), Green-Wood Cemetery (Brooklyn), Old Jewish Cemetery (Prague), St. Louis Cemetery (New Orleans), Bonaventure Cemetery (Savannah).
+    - REJECT: Ordinary cemeteries, small local graveyards, modern memorial parks without architectural distinction, or any cemetery that doesn't meet ALL criteria above.
     - CRITICAL: Mark these with the architectural style "Graveyard" (not "Cemetery" or other styles). This is the standard style for all graveyards and cemeteries.
-    - These should be included even if slightly less "evil" - their historical significance and imposing scale qualify them.
+    - These should be included even if slightly less "evil" - their historical significance, architectural beauty, and imposing scale qualify them.
     
     REJECT IF:
     - Building is small or medium-sized (only large-scale structures)
@@ -894,7 +931,7 @@ export const checkPOIStyleCriteria = async (building: Building): Promise<{ match
   - Must be LARGE-SCALE, monumental structures
   - Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING
   - Architectural styles: Soviet/Communist styles, Brutalism variants, Deco variants, Gothic variants, or other menacing styles
-  - OR: Epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited (e.g., Père Lachaise, Highgate Cemetery, La Recoleta, Arlington National Cemetery)
+  - OR: World-class, internationally famous graveyards/cemeteries that are major tourist destinations with exceptional architectural beauty and historical significance (e.g., Père Lachaise, Highgate Cemetery, La Recoleta, Arlington National Cemetery). Must be architecturally stunning landmarks, not ordinary cemeteries.
   - Reference: Think r/evilbuildings - Polish Palace of Culture and Science level of imposing
   
   Return JSON with "matches" (boolean) and if matches is true, include enriched "building" object with all required fields.`;
