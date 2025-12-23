@@ -49,7 +49,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     if (isLoading && searchStatus !== 'idle') {
       // Keep the Nastya messages together as a pair
       const nastyaPair = [
-        'Reminding Nastya the Nick is crazy about her',
+        'Reminding Nastya that Nick is absolutely crazy about her',
         'No really, Nick like "like" likes Nastya'
       ];
       
