@@ -123,6 +123,13 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
     3. AESTHETIC: Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING. Think buildings that look like supervillain headquarters, dystopian government facilities, or dark citadels.
     4. RARITY: These are exceptional, noteworthy buildings. If a city has 5-8 qualifying buildings, you're being too lenient. Most cities will have 0-3 at most.
     
+    PRIORITY 3 - FAMOUS GRAVEYARDS & CEMETERIES:
+    - Search for epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited by tourists and locals.
+    - Examples: Père Lachaise Cemetery (Paris), Highgate Cemetery (London), La Recoleta Cemetery (Buenos Aires), Arlington National Cemetery (Virginia), Mount Auburn Cemetery (Massachusetts), Green-Wood Cemetery (Brooklyn), Old Jewish Cemetery (Prague), St. Louis Cemetery (New Orleans), Bonaventure Cemetery (Savannah), Forest Lawn Memorial Park (Los Angeles).
+    - Must be substantial in size, architecturally impressive, historically significant, and well-known enough that visitors commonly seek them out.
+    - Mark these with an appropriate architectural style (often "Gothic Revival", "Victorian Gothic", "Monumental", or "Cemetery").
+    - These should be included even if slightly less "evil" - their historical significance and imposing scale qualify them.
+    
     REJECT IF:
     - Building is small or medium-sized (only large-scale structures)
     - Building is "pretty", "quaint", or aesthetically pleasing
@@ -142,7 +149,7 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
        - "city" (string, city name only)
        - "country" (string, country name only)
        - "description" (string, short, evocative, noir-style - emphasize the imposing/scary nature)
-       - "style" (string - use comma-separated styles if the building has multiple architectural styles. For example: "Cathedral, Gothic Revival" or "Brutalism, Soviet Modernism". Use any appropriate style name from: Stalinist Gothic, Soviet Modernism, Socialist Classicism, Brutalism, New Brutalism, Dark Deco, Art Deco, Gothic Revival, Neo-Gothic, Cathedral, Totalitarian, Fascist Architecture, Monumental, Fortress, Industrial Gothic, Cyberpunk, Dystopian, or any other accurate variant/synonym. Style naming is subjective - use what best describes the building. The first style listed will be considered the primary style.)
+       - "style" (string - use comma-separated styles if the building has multiple architectural styles. For example: "Cathedral, Gothic Revival" or "Brutalism, Soviet Modernism". Use any appropriate style name from: Stalinist Gothic, Soviet Modernism, Socialist Classicism, Brutalism, New Brutalism, Dark Deco, Art Deco, Gothic Revival, Neo-Gothic, Cathedral, Totalitarian, Fascist Architecture, Monumental, Fortress, Industrial Gothic, Cyberpunk, Dystopian, Graveyard, Victorian Gothic, or any other accurate variant/synonym. IMPORTANT: For graveyards/cemeteries, always use "Graveyard" as the style. Style naming is subjective - use what best describes the building. The first style listed will be considered the primary style.)
        - "isPrioritized" (boolean, optional - true for historically significant Art Deco buildings by famous architects)
        - "architect" (string, optional - name of architect if well-known, e.g., "William Van Alen", "Shreve, Lamb & Harmon")
        - "lat" (number, latitude)
@@ -154,7 +161,8 @@ export const fetchLairs = async (locationQuery: string, userLat?: number, userLn
   
   SEARCH PRIORITY:
   1. FIRST: Search for historically significant Art Deco buildings by well-known architects (e.g., Empire State Building, Chrysler Building, Rockefeller Center). Include these even if slightly less extreme - they are prioritized.
-  2. THEN: If no Art Deco masterpieces found, search for other extreme, large-scale, imposing buildings.
+  2. THEN: Search for other extreme, large-scale, imposing buildings.
+  3. ALSO: Search for epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited (e.g., Père Lachaise, Highgate Cemetery, La Recoleta, Arlington National Cemetery). These should be substantial, architecturally impressive, and well-known enough that visitors commonly seek them out.
   
   QUALITY STANDARD: These should be rare, exceptional examples. Most cities will have 0-3 qualifying buildings at most. If you find more than 5, you're being too lenient - only include the MOST extreme examples.
   
@@ -844,6 +852,13 @@ export const checkPOIStyleCriteria = async (building: Building): Promise<{ match
     3. AESTHETIC: Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING. Think buildings that look like supervillain headquarters, dystopian government facilities, or dark citadels.
     4. RARITY: These are exceptional, noteworthy buildings.
     
+    PRIORITY 3 - FAMOUS GRAVEYARDS & CEMETERIES:
+    - Epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited by tourists and locals.
+    - Examples: Père Lachaise Cemetery (Paris), Highgate Cemetery (London), La Recoleta Cemetery (Buenos Aires), Arlington National Cemetery (Virginia), Mount Auburn Cemetery (Massachusetts), Green-Wood Cemetery (Brooklyn), Old Jewish Cemetery (Prague), St. Louis Cemetery (New Orleans), Bonaventure Cemetery (Savannah), Forest Lawn Memorial Park (Los Angeles).
+    - Must be substantial in size, architecturally impressive, historically significant, and well-known enough that visitors commonly seek them out.
+    - CRITICAL: Mark these with the architectural style "Graveyard" (not "Cemetery" or other styles). This is the standard style for all graveyards and cemeteries.
+    - These should be included even if slightly less "evil" - their historical significance and imposing scale qualify them.
+    
     REJECT IF:
     - Building is small or medium-sized (only large-scale structures)
     - Building is "pretty", "quaint", or aesthetically pleasing
@@ -862,7 +877,7 @@ export const checkPOIStyleCriteria = async (building: Building): Promise<{ match
          - "city" (string, city name only)
          - "country" (string, country name only)
          - "description" (string, short, evocative, noir-style)
-         - "style" (string - use comma-separated styles if multiple apply, e.g., "Cathedral, Gothic Revival". The first style is the primary style.)
+         - "style" (string - use comma-separated styles if multiple apply, e.g., "Cathedral, Gothic Revival". IMPORTANT: For graveyards/cemeteries, always use "Graveyard" as the style. The first style is the primary style.)
          - "isPrioritized" (boolean, optional)
          - "architect" (string, optional)
          - "lat" (number)
@@ -879,6 +894,7 @@ export const checkPOIStyleCriteria = async (building: Building): Promise<{ match
   - Must be LARGE-SCALE, monumental structures
   - Must be genuinely SCARY, OMINOUS, or POWER-PROJECTING
   - Architectural styles: Soviet/Communist styles, Brutalism variants, Deco variants, Gothic variants, or other menacing styles
+  - OR: Epic, large-scale, historically significant, and famous graveyards/cemeteries that are commonly visited (e.g., Père Lachaise, Highgate Cemetery, La Recoleta, Arlington National Cemetery)
   - Reference: Think r/evilbuildings - Polish Palace of Culture and Science level of imposing
   
   Return JSON with "matches" (boolean) and if matches is true, include enriched "building" object with all required fields.`;

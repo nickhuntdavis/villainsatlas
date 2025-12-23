@@ -38,6 +38,7 @@ export enum ArchitecturalStyle {
   CYBERPUNK = 'Cyberpunk',
   DYSTOPIAN = 'Dystopian',
   CATHEDRAL = 'Cathedral',
+  GRAVEYARD = 'Graveyard',
   
   // Fallback
   OTHER = 'Other',

@@ -88,6 +88,7 @@ async function checkMultipleStyles(building) {
     - Deco: Dark Deco, Art Deco, Streamlined Moderne, Gothic Deco
     - Gothic: Gothic Revival, Neo-Gothic, Victorian Gothic, Industrial Gothic
     - Cathedral: Cathedral (for cathedrals specifically)
+    - Graveyard: Graveyard (for graveyards and cemeteries)
     - Other Menacing: Totalitarian, Fascist Architecture, Monumental, Fortress, Bunker, Cyberpunk, Dystopian
     
     CRITICAL: Only identify MULTIPLE styles if the building LEGITIMATELY exhibits distinct characteristics of multiple architectural movements. 

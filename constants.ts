@@ -59,6 +59,9 @@ export const normalizeStyle = (style: string | undefined): string => {
   // Cathedral - check before other styles to catch cathedrals specifically
   if (normalized.includes('cathedral')) return 'Cathedral';
   
+  // Graveyard/Cemetery - check before other styles
+  if (normalized.includes('graveyard') || normalized.includes('cemetery')) return 'Graveyard';
+  
   // Other menacing styles
   if (normalized.includes('totalitarian')) return 'Totalitarian';
   if (normalized.includes('fascist')) return 'Fascist Architecture';
@@ -116,6 +119,9 @@ export const GENRE_COLORS: Record<string, string> = {
   'Cathedral': '#FFD700',               // Gold/yellow
   'Cathedral (Gothic)': '#FFC700',     // Slightly darker gold
   'Cathedral (Romanesque)': '#FFB700', // Darker gold
+  
+  // Graveyard - Black
+  'Graveyard': '#000000',               // Black
   
   // Other menacing styles - Grey-blue palette (complementary to existing palette)
   'Totalitarian': '#8B9DC3',           // Grey-blue
