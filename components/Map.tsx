@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, ZoomControl, useMap, useMapEvents, CircleMarker, Popup } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-markercluster';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { Coordinates, Building } from '../types';
-import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM } from '../constants';
+import { MAP_TILE_URL_DARK, MAP_TILE_URL_LIGHT, MAP_ATTRIBUTION, DEFAULT_ZOOM, getPrimaryStyleColor, parseStyles, normalizeStyle } from '../constants';
 import { BuildingMarker } from './BuildingMarker';
 import { getThemeColors } from '../ui/theme';
 
@@ -298,17 +302,102 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
         </>
       )}
 
-      {buildings.map((b) => (
-        <BuildingMarker
-          key={b.id}
-          building={b}
-          isSelected={selectedBuilding?.id === b.id}
-          onSelect={onSelectBuilding}
-          onTripleClick={b.name === "Nick" ? onNickTripleClick : undefined}
-          adminModeEnabled={adminModeEnabled}
-          onEdit={onEditBuilding}
-        />
-      ))}
+      <MarkerClusterGroup
+        chunkedLoading={false}
+        maxClusterRadius={80}
+        spiderfyOnMaxZoom={true}
+        showCoverageOnHover={false}
+        zoomToBoundsOnClick={true}
+        removeOutsideVisibleBounds={true}
+        iconCreateFunction={(cluster) => {
+          // Get all buildings in this cluster
+          const markers = cluster.getAllChildMarkers();
+          const clusterBuildings = markers.map((marker: any) => {
+            // Extract building from marker instance
+            return (marker as any).building;
+          }).filter(Boolean) as Building[];
+          
+          // Count styles to find most common
+          const styleCounts: Record<string, number> = {};
+          clusterBuildings.forEach(building => {
+            if (building && building.style) {
+              const styles = parseStyles(building.style);
+              styles.forEach(style => {
+                const normalized = normalizeStyle(style);
+                styleCounts[normalized] = (styleCounts[normalized] || 0) + 1;
+              });
+            }
+          });
+          
+          // Find most common style
+          let mostCommonStyle = 'Other';
+          let maxCount = 0;
+          Object.entries(styleCounts).forEach(([style, count]) => {
+            if (count > maxCount) {
+              maxCount = count;
+              mostCommonStyle = style;
+            }
+          });
+          
+          // Get color for most common style
+          const clusterColor = getPrimaryStyleColor(mostCommonStyle);
+          const count = cluster.getChildCount();
+          
+          // Create custom cluster icon with count and color
+          const size = count < 10 ? 40 : count < 100 ? 50 : 60;
+          
+          return L.divIcon({
+            html: `<div style="
+              width: ${size}px;
+              height: ${size}px;
+              background-color: ${clusterColor};
+              border: 3px solid #09090b;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #09090b;
+              font-weight: bold;
+              font-size: ${count < 10 ? '14px' : count < 100 ? '16px' : '18px'};
+              box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            ">${count}</div>`,
+            className: 'custom-cluster-icon',
+            iconSize: L.point(size, size),
+            iconAnchor: L.point(size / 2, size / 2),
+          });
+        }}
+        onClusterClick={(cluster) => {
+          // Auto-zoom to show all markers in cluster with padding
+          const markers = cluster.getAllChildMarkers();
+          if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            const bounds = group.getBounds();
+            const map = cluster.layer._map;
+            // Zoom to bounds with padding to ensure all markers are visible
+            map.fitBounds(bounds.pad(0.15), {
+              maxZoom: 18,
+              duration: 1.5,
+            });
+          }
+        }}
+      >
+        {buildings
+          .filter((b, index, self) => 
+            // Filter duplicates by ID - keep only the first occurrence
+            index === self.findIndex((other) => other.id === b.id)
+          )
+          .map((b) => (
+            <BuildingMarker
+              key={b.id}
+              building={b}
+              isSelected={selectedBuilding?.id === b.id}
+              onSelect={onSelectBuilding}
+              onTripleClick={b.name === "Nick" ? onNickTripleClick : undefined}
+              adminModeEnabled={adminModeEnabled}
+              onEdit={onEditBuilding}
+            />
+          ))}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 };

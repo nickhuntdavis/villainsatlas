@@ -104,8 +104,8 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e as any);
+      if (e.key === 'Enter') {
+        handleSubmit(e as any);
     }
   };
 

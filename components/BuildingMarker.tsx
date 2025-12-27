@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 import { Building, ArchitecturalStyle } from '../types';
 import { getPrimaryStyleColor } from '../constants';
 import { createMarkerIcon } from '../ui/atoms/MarkerIcon';
@@ -39,7 +40,8 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
   // Use primary (first) style for color - prioritized buildings are bigger and have glow but same color
   const color = getPrimaryStyleColor(building.style);
 
-  const handleClick = () => {
+  // Memoize handleClick to prevent ref callback from changing on every render
+  const handleClick = useCallback(() => {
     // If admin mode is enabled, open edit modal instead of building details
     if (adminModeEnabled && onEdit) {
       onEdit(building);
@@ -61,19 +63,7 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
       duration: 1.5,
       easeLinearity: 0.25
     });
-  };
-
-  // Use the design system MarkerIcon atom
-  // Priority: Nick > Disgusting style > hasPurpleHeart > standard
-  const icon = createMarkerIcon({
-    color,
-    isSelected,
-    variant: isNick ? 'nick' : (isDisgusting || building.hasPurpleHeart) ? 'purpleHeart' : 'standard',
-    isPrioritized: building.isPrioritized && !isPalaceOfCulture && !building.hasPurpleHeart && !isDisgusting,
-    isPalaceOfCulture: isPalaceOfCulture,
-    hasPurpleHeart: building.hasPurpleHeart || isDisgusting || false,
-    zoom: zoom,
-  });
+  }, [adminModeEnabled, onEdit, building, map, isNick, isPalaceOfCulture, onTripleClick, onSelect]);
 
   // Create accessible label for the marker
   const markerLabel = building.city && building.country
@@ -82,9 +72,44 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     ? `${building.name}, ${building.location}`
     : building.name;
 
+  // Memoize icon to prevent unnecessary recreation (only recreate when dependencies change)
+  // Use the design system MarkerIcon atom
+  // Priority: Nick > Disgusting style > hasPurpleHeart > standard
+  const icon = useMemo(() => createMarkerIcon({
+    color,
+    isSelected,
+    variant: isNick ? 'nick' : (isDisgusting || building.hasPurpleHeart) ? 'purpleHeart' : 'standard',
+    isPrioritized: building.isPrioritized && !isPalaceOfCulture && !building.hasPurpleHeart && !isDisgusting,
+    isPalaceOfCulture: isPalaceOfCulture,
+    hasPurpleHeart: building.hasPurpleHeart || isDisgusting || false,
+    zoom: zoom,
+  }), [color, isSelected, isNick, isDisgusting, building.hasPurpleHeart, building.isPrioritized, isPalaceOfCulture, zoom]);
+
+  // Store marker ref to attach click handler manually
+  const markerRef = useRef<L.Marker | null>(null);
+  
   // Ref callback to access the Leaflet marker instance and set accessibility attributes
-  const markerRefCallback = (markerInstance: L.Marker | null) => {
+  // Use useCallback to prevent the ref from being recreated on every render
+  const markerRefCallback = useCallback((markerInstance: L.Marker | null) => {
+    markerRef.current = markerInstance;
+    
     if (markerInstance) {
+      // Store building data on marker for cluster access (only once)
+      if (!(markerInstance as any).building) {
+        (markerInstance as any).building = building;
+      }
+      
+      // Manually attach click handler to work with MarkerClusterGroup
+      // Remove any existing click handlers first to prevent duplicates
+      markerInstance.off('click');
+      markerInstance.on('click', (e) => {
+        // Prevent cluster from handling this click
+        if (e.originalEvent) {
+          L.DomEvent.stopPropagation(e.originalEvent);
+        }
+        handleClick();
+      });
+      
       const markerElement = markerInstance.getElement();
       if (markerElement) {
         const iconElement = markerElement.querySelector('.leaflet-marker-icon') as HTMLElement;
@@ -99,21 +124,21 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
           iconElement.style.display = 'flex';
           iconElement.style.alignItems = 'center';
           iconElement.style.justifyContent = 'center';
+          // Ensure pointer events work
+          iconElement.style.pointerEvents = 'auto';
+          iconElement.style.cursor = 'pointer';
         }
       }
     }
-  };
+  }, [building, markerLabel, handleClick]);
 
   return (
     <Marker
-      key={`${building.id}-zoom-${Math.floor(zoom)}`}
+      key={building.id}
       ref={markerRefCallback}
       position={[building.coordinates.lat, building.coordinates.lng]}
       icon={icon}
       title={markerLabel}
-      eventHandlers={{
-        click: handleClick,
-      }}
       keyboard={true}
     >
        {/* We don't use standard Popup often in this design, opting for the side panel, 

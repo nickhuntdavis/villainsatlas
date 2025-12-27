@@ -90,49 +90,49 @@ export const getPrimaryStyleColor = (style: string | undefined): string => {
 };
 
 export const GENRE_COLORS: Record<string, string> = {
-  // Soviet/Communist styles - Lime green palette variations
-  'Stalinist Gothic': '#C1EF7B',      // Base lime green
-  'Soviet Modernism': '#B5E86A',     // Slightly darker lime
-  'Socialist Classicism': '#A9E159',  // Darker lime
-  'Soviet Brutalism': '#9DDA48',      // Darkest lime
+  // Soviet/Communist styles - Bright cyan palette (color-blind friendly, high contrast on dark)
+  'Stalinist Gothic': '#00FFFF',      // Bright cyan
+  'Soviet Modernism': '#00E5E5',     // Slightly darker cyan
+  'Socialist Classicism': '#00CCCC',  // Darker cyan
+  'Soviet Brutalism': '#00B3B3',      // Darkest cyan
   
-  // Brutalist variants - Orange/coral palette variations
-  'Brutalism': '#FF8052',             // Base orange/coral
-  'New Brutalism': '#FF8F65',         // Lighter orange
-  'Concrete Brutalism': '#FF9E78',    // Lightest orange
-  'Brutalist': '#FF8052',             // Alias
+  // Brutalist variants - Bright orange palette (color-blind friendly, high contrast)
+  'Brutalism': '#FF8C00',             // Bright orange
+  'New Brutalism': '#FFA500',         // Lighter orange
+  'Concrete Brutalism': '#FFB84D',    // Lightest orange
+  'Brutalist': '#FF8C00',             // Alias
   
-  // Deco variants - Purple palette variations
-  'Dark Deco': '#9873D3',              // Base purple
-  'Art Deco': '#8A65C8',               // Slightly darker purple
-  'Streamlined Moderne': '#7C57BD',    // Darker purple
-  'Gothic Deco': '#6E49B2',            // Darkest purple
+  // Deco variants - Bright magenta/pink palette (color-blind friendly, high contrast)
+  'Dark Deco': '#FF00FF',              // Bright magenta
+  'Art Deco': '#FF33FF',               // Slightly lighter magenta
+  'Streamlined Moderne': '#FF66FF',    // Lighter magenta
+  'Gothic Deco': '#FF99FF',            // Lightest magenta
   
-  // Gothic variants - Light grey palette (no pink tones)
-  'Gothic Revival': '#D4D4D4',        // Light grey
-  'Neo-Gothic': '#C8C8C8',            // Medium-light grey
-  'Gothic': '#BCBCBC',                 // Medium grey
-  'Victorian Gothic': '#B0B0B0',       // Medium-dark grey
-  'Industrial Gothic': '#A4A4A4',      // Dark grey
+  // Gothic variants - Bright yellow palette (color-blind friendly, high contrast)
+  'Gothic Revival': '#FFD700',        // Bright gold/yellow
+  'Neo-Gothic': '#FFE44D',            // Lighter yellow
+  'Gothic': '#FFFF00',                 // Pure yellow
+  'Victorian Gothic': '#FFCC00',       // Darker yellow
+  'Industrial Gothic': '#FFB300',      // Darkest yellow
   
-  // Cathedral - Yellow palette (variations)
-  'Cathedral': '#FFD700',               // Gold/yellow
-  'Cathedral (Gothic)': '#FFC700',     // Slightly darker gold
-  'Cathedral (Romanesque)': '#FFB700', // Darker gold
+  // Cathedral - Bright white/light cyan palette (high contrast)
+  'Cathedral': '#FFFFFF',               // White (maximum contrast)
+  'Cathedral (Gothic)': '#E6F3FF',     // Very light cyan
+  'Cathedral (Romanesque)': '#CCE7FF', // Light cyan
   
-  // Graveyard - Black
-  'Graveyard': '#000000',               // Black
+  // Graveyard - Bright red (high contrast, distinguishable from other colors)
+  'Graveyard': '#FF0000',               // Bright red
   
-  // Other menacing styles - Grey-blue palette (complementary to existing palette)
-  'Totalitarian': '#8B9DC3',           // Grey-blue
-  'Fascist Architecture': '#7A8DB0',     // Darker grey-blue
-  'Monumental': '#697D9D',              // Dark grey-blue
-  'Fortress': '#9A9A9A',                // Neutral grey
-  'Bunker': '#8E8E8E',                  // Darker neutral grey
-  'Cyberpunk': '#828282',               // Dark neutral grey
-  'Dystopian': '#767676',               // Darkest neutral grey
-  'Disgusting': '#FF5D88',              // Red (same as Nick's heart and romantic locations)
+  // Other menacing styles - Bright blue/green palette (color-blind friendly)
+  'Totalitarian': '#0080FF',           // Bright blue
+  'Fascist Architecture': '#0066CC',     // Darker blue
+  'Monumental': '#004C99',              // Dark blue
+  'Fortress': '#00FF00',                // Bright green
+  'Bunker': '#00CC00',                  // Darker green
+  'Cyberpunk': '#00FF80',               // Bright green-cyan
+  'Dystopian': '#00CC66',               // Darker green-cyan
+  'Disgusting': '#FF5D88',              // Bright pink (same as Nick's heart and romantic locations)
   
-  // Fallback
-  'Other': '#909090',                   // Medium neutral grey
+  // Fallback - Bright cyan-blue (high contrast)
+  'Other': '#00BFFF',                   // Deep sky blue
 };

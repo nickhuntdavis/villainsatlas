@@ -370,7 +370,7 @@ function App() {
 
   // Track if user has manually moved the map (via search) to prevent auto-centering
   const userHasSearchedRef = useRef(false);
-  
+
   // Function to load user location and nearby buildings
   // Defined as useCallback so it always has access to latest getBaserowBuildingsNear
   const loadUserLocationAndBuildings = useCallback((shouldSetCenter: boolean = true) => {
@@ -382,7 +382,7 @@ function App() {
         const newCenter: Coordinates = { lat: latitude, lng: longitude };
         // Only set center if user hasn't searched yet, or if explicitly requested
         if (shouldSetCenter && !userHasSearchedRef.current) {
-          setCenter(newCenter);
+        setCenter(newCenter);
         }
         setUserLocation(newCenter);
 
