@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building, Coordinates, Comment } from '../types';
-import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark, MessageSquare } from 'lucide-react';
+import { X, MapPin, Navigation, ImageOff, User, MessageCircle, ThumbsDown, Bookmark, MessageSquare, Edit } from 'lucide-react';
 import { GENRE_COLORS, normalizeStyles, getPrimaryStyleColor } from '../constants';
 import { typography, fontFamily } from '../ui/theme';
 import { ImageGallery } from './ImageGallery';
@@ -15,6 +15,7 @@ interface BuildingDetailsProps {
   onAddComment?: () => void;
   onEditComment?: (index: number) => void;
   onDeleteComment?: (index: number) => void;
+  onEditLocation?: () => void;
 }
 
 // Helper function to extract URL from markdown link format [text](url) or just return URL if already plain
@@ -56,7 +57,7 @@ const formatDistance = (meters: number): string => {
   return `${(meters / 1000).toFixed(1)}km`;
 };
 
-export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete, onFavourite, onAddComment, onEditComment, onDeleteComment }) => {
+export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onClose, theme, userLocation, onDelete, onFavourite, onAddComment, onEditComment, onDeleteComment, onEditLocation }) => {
   const [imgError, setImgError] = useState(false);
 
   // Reset error state when building changes
@@ -281,7 +282,7 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                     className="p-1.5 hover:opacity-80 transition-opacity"
                     title={building.favourites ? "Remove from favourites" : "Add to favourites"}
                     aria-label={building.favourites ? "Remove from favourites" : "Add to favourites"}
-                    style={{ color: building.favourites ? '#FFD700' : '#11162F' }}
+                    style={{ color: building.favourites ? '#FFD700' : '#FFFFFF' }}
                   >
                     <Bookmark size={16} strokeWidth={2} fill={building.favourites ? 'currentColor' : 'none'} aria-hidden="true" />
                   </button>
@@ -292,9 +293,20 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                     className="p-1.5 hover:opacity-80 transition-opacity"
                     title="Add a comment"
                     aria-label="Add a comment"
-                    style={{ color: '#11162F' }}
+                    style={{ color: '#FFFFFF' }}
                   >
                     <MessageSquare size={16} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                )}
+                {onEditLocation && (
+                  <button
+                    onClick={onEditLocation}
+                    className="p-1.5 hover:opacity-80 transition-opacity"
+                    title="Edit location"
+                    aria-label="Edit location"
+                    style={{ color: '#FFFFFF' }}
+                  >
+                    <Edit size={16} strokeWidth={2} aria-hidden="true" />
                   </button>
                 )}
                 {onDelete && (
@@ -303,7 +315,7 @@ export const BuildingDetails: React.FC<BuildingDetailsProps> = ({ building, onCl
                     className="p-1.5 hover:opacity-80 transition-opacity"
                     title="Remove this building"
                     aria-label="Remove this building"
-                    style={{ color: '#11162F' }}
+                    style={{ color: '#FFFFFF' }}
                   >
                     <ThumbsDown size={16} strokeWidth={2} aria-hidden="true" />
                   </button>

@@ -1376,6 +1376,13 @@ function App() {
     }
   }, [adminModeEnabled]);
 
+  // Long-press handler (3 seconds) to add new location - works for all users
+  const handleMapLongPress = useCallback((coordinates: Coordinates) => {
+    setClickedCoordinates(coordinates);
+    setEditingBuilding(null);
+    setShowEditorModal(true);
+  }, []);
+
   const handleEditBuilding = useCallback((building: Building) => {
     if (adminModeEnabled) {
       setEditingBuilding(building);
@@ -1799,6 +1806,7 @@ function App() {
           onNickTripleClick={handleNickTripleClick}
           adminModeEnabled={adminModeEnabled}
           onMapClick={handleMapClick}
+          onMapLongPress={handleMapLongPress}
           onEditBuilding={handleEditBuilding}
           userLocation={userLocation}
         />
@@ -1942,6 +1950,11 @@ function App() {
                 setError('Failed to delete comment');
               } finally {
                 setLoading(false);
+              }
+            }}
+            onEditLocation={() => {
+              if (selectedBuilding) {
+                handleEditBuilding(selectedBuilding);
               }
             }}
           />

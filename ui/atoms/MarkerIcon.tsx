@@ -118,12 +118,15 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
       </style>
     `;
   } else {
-    // Standard markers - 42px x 42px
-    baseSize = 42;
+    // Standard markers - 42px x 42px, larger if selected
+    baseSize = isSelected ? 56 : 42;
   }
   
   // Calculate actual size based on zoom level (minimum 28px)
   const size = calculateSize(baseSize, zoom);
+  
+  // Use white color for selected pins
+  const pinColor = isSelected ? '#FFFFFF' : color;
   
   let html: string;
   
@@ -164,16 +167,19 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
     `;
   } else {
     // Standard sharp, angular pin shape (flipped upside down)
+    // Selected pins are white with darker border for visibility
+    const borderColor = isSelected ? '#09090b' : '#09090b';
+    const innerCircleColor = isSelected ? '#09090b' : '#09090b';
     html = `
       ${glowStyle}
       <div class="${animationClass}" style="
         width: ${size}px;
         height: ${size}px;
-        background-color: ${color};
+        background-color: ${pinColor};
         transform: rotate(225deg);
         border-radius: 0 50% 50% 50%;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        border: 2px solid #09090b;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.${isSelected ? '8' : '1'});
+        border: ${isSelected ? '3px' : '2px'} solid ${borderColor};
         position: relative;
         display: flex;
         align-items: center;
@@ -182,7 +188,7 @@ export const createMarkerIcon = ({ color, isSelected, variant = 'standard', isPr
         <div style="
           width: 30%;
           height: 30%;
-          background-color: #09090b;
+          background-color: ${innerCircleColor};
           border-radius: 50%;
         "></div>
       </div>

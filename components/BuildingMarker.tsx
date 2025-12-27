@@ -45,9 +45,10 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     // If admin mode is enabled, open edit modal instead of building details
     if (adminModeEnabled && onEdit) {
       onEdit(building);
-      map.flyTo([building.coordinates.lat, building.coordinates.lng], 15, {
-        duration: 1.5,
-        easeLinearity: 0.25
+      // Center map on building without changing zoom
+      map.setView([building.coordinates.lat, building.coordinates.lng], map.getZoom(), {
+        animate: true,
+        duration: 0.5
       });
       return;
     }
@@ -59,9 +60,10 @@ export const BuildingMarker: React.FC<BuildingMarkerProps> = ({ building, isSele
     
     // Always do the normal click behavior
     onSelect(building);
-    map.flyTo([building.coordinates.lat, building.coordinates.lng], 15, {
-      duration: 1.5,
-      easeLinearity: 0.25
+    // Center map on building without changing zoom
+    map.setView([building.coordinates.lat, building.coordinates.lng], map.getZoom(), {
+      animate: true,
+      duration: 0.5
     });
   }, [adminModeEnabled, onEdit, building, map, isNick, isPalaceOfCulture, onTripleClick, onSelect]);
 

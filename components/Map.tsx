@@ -172,16 +172,30 @@ const LCPOptimizer: React.FC = () => {
   return null;
 };
 
-// Component to handle map clicks (only when admin mode is enabled)
+// Component to handle map clicks and long-press (3 seconds) to add new location
 interface MapClickHandlerProps {
   enabled: boolean;
   onMapClick: (coordinates: Coordinates) => void;
+  onLongPress?: (coordinates: Coordinates) => void;
 }
 
-const MapClickHandler: React.FC<MapClickHandlerProps> = ({ enabled, onMapClick }) => {
+const MapClickHandler: React.FC<MapClickHandlerProps> = ({ enabled, onMapClick, onLongPress }) => {
+  const map = useMap();
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressCoordsRef = useRef<Coordinates | null>(null);
+  const isLongPressRef = useRef(false);
+  
   useMapEvents({
     click: (e) => {
-      if (enabled) {
+      // Clear any pending long-press
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        longPressCoordsRef.current = null;
+      }
+      
+      // Only handle click if it wasn't a long-press
+      if (!isLongPressRef.current && enabled) {
         // Check if click target is a marker - if so, don't trigger map click
         const target = e.originalEvent.target as HTMLElement;
         const isMarker = target.closest('.leaflet-marker-icon') || target.closest('.leaflet-popup');
@@ -193,8 +207,100 @@ const MapClickHandler: React.FC<MapClickHandlerProps> = ({ enabled, onMapClick }
           });
         }
       }
+      
+      isLongPressRef.current = false;
+    },
+    mousedown: (e) => {
+      if (!onLongPress) return;
+      
+      // Check if target is a marker - if so, don't trigger long-press
+      const target = e.originalEvent.target as HTMLElement;
+      const isMarker = target.closest('.leaflet-marker-icon') || target.closest('.leaflet-popup');
+      
+      if (!isMarker) {
+        isLongPressRef.current = false;
+        longPressCoordsRef.current = {
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+        };
+        
+        // Start long-press timer (3 seconds)
+        longPressTimerRef.current = setTimeout(() => {
+          if (longPressCoordsRef.current) {
+            isLongPressRef.current = true;
+            onLongPress(longPressCoordsRef.current);
+            longPressCoordsRef.current = null;
+          }
+        }, 3000);
+      }
+    },
+    mouseup: () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        longPressCoordsRef.current = null;
+      }
+    },
+    mouseleave: () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        longPressCoordsRef.current = null;
+      }
     },
   });
+  
+  // Also handle touch events for mobile
+  useEffect(() => {
+    if (!onLongPress) return;
+    
+    const mapContainer = map.getContainer();
+    let touchStartCoords: Coordinates | null = null;
+    let touchTimer: NodeJS.Timeout | null = null;
+    let isTouchLongPress = false;
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const isMarker = target.closest('.leaflet-marker-icon') || target.closest('.leaflet-popup');
+      
+      if (!isMarker) {
+        isTouchLongPress = false;
+        const touch = e.touches[0];
+        const latlng = map.containerPointToLatLng(map.mouseEventToContainerPoint(touch as any));
+        touchStartCoords = { lat: latlng.lat, lng: latlng.lng };
+        
+        touchTimer = setTimeout(() => {
+          if (touchStartCoords) {
+            isTouchLongPress = true;
+            onLongPress(touchStartCoords);
+            touchStartCoords = null;
+          }
+        }, 3000);
+      }
+    };
+    
+    const handleTouchEnd = () => {
+      if (touchTimer) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+        touchStartCoords = null;
+      }
+      isTouchLongPress = false;
+    };
+    
+    mapContainer.addEventListener('touchstart', handleTouchStart);
+    mapContainer.addEventListener('touchend', handleTouchEnd);
+    mapContainer.addEventListener('touchcancel', handleTouchEnd);
+    
+    return () => {
+      mapContainer.removeEventListener('touchstart', handleTouchStart);
+      mapContainer.removeEventListener('touchend', handleTouchEnd);
+      mapContainer.removeEventListener('touchcancel', handleTouchEnd);
+      if (touchTimer) {
+        clearTimeout(touchTimer);
+      }
+    };
+  }, [map, enabled, onLongPress]);
   
   return null;
 };
@@ -209,11 +315,12 @@ interface MapProps {
   onNickTripleClick?: () => void;
   adminModeEnabled?: boolean;
   onMapClick?: (coordinates: Coordinates) => void;
+  onMapLongPress?: (coordinates: Coordinates) => void;
   onEditBuilding?: (building: Building) => void;
   userLocation?: Coordinates | null;
 }
 
-export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick, adminModeEnabled = false, onMapClick, onEditBuilding, userLocation }) => {
+export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, onSelectBuilding, onBoundsRequest, theme, onNickTripleClick, adminModeEnabled = false, onMapClick, onMapLongPress, onEditBuilding, userLocation }) => {
   const isDark = theme === 'dark';
   const colors = getThemeColors(theme);
   const [showUserLocation, setShowUserLocation] = useState(true);
@@ -266,8 +373,8 @@ export const Map: React.FC<MapProps> = ({ center, buildings, selectedBuilding, o
       <MapUpdater center={center} />
       <MapBoundsTracker onBoundsRequest={onBoundsRequest} />
       <LCPOptimizer />
-      {adminModeEnabled && onMapClick && (
-        <MapClickHandler enabled={adminModeEnabled} onMapClick={onMapClick} />
+      {onMapClick && (
+        <MapClickHandler enabled={true} onMapClick={onMapClick} onLongPress={onMapLongPress} />
       )}
 
       {/* User Location Indicator */}

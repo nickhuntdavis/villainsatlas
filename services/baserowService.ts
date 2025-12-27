@@ -747,6 +747,59 @@ export const buildingExists = async (building: Building): Promise<boolean> => {
   return result.exists;
 };
 
+// Helper to extract base name (before parentheses or other separators)
+const extractBaseName = (name: string): string => {
+  // Remove content in parentheses, brackets, or after common separators
+  const cleaned = name
+    .replace(/\s*\([^)]*\)/g, '') // Remove parentheses content
+    .replace(/\s*\[[^\]]*\]/g, '') // Remove bracket content
+    .replace(/\s*-\s*[^-]*$/g, '') // Remove content after dash
+    .trim();
+  return normalizeNameForMatch(cleaned);
+};
+
+// Helper to check if names share a significant portion
+const namesSharePortion = (name1: string, name2: string): boolean => {
+  const base1 = extractBaseName(name1);
+  const base2 = extractBaseName(name2);
+  
+  // If base names are the same or one contains the other, they share a portion
+  if (base1 === base2) return true;
+  if (base1.length >= 5 && base2.length >= 5) {
+    // Check if one base name contains the other (for cases like "De Inktpot" in both names)
+    if (base1.includes(base2) || base2.includes(base1)) {
+      const shorter = Math.min(base1.length, base2.length);
+      const longer = Math.max(base1.length, base2.length);
+      // Require at least 60% overlap
+      return shorter / longer >= 0.6;
+    }
+  }
+  
+  return false;
+};
+
+// Helper to check if building is one of the Seven Sisters in Russia
+const isSevenSisters = (building: Building): boolean => {
+  const name = building.name.toLowerCase();
+  const country = building.country?.toLowerCase() || '';
+  const city = building.city?.toLowerCase() || '';
+  
+  // Check if it's in Russia and matches Seven Sisters pattern
+  if (!country.includes('russia') && !country.includes('россия')) return false;
+  
+  // Seven Sisters are in Moscow
+  if (!city.includes('moscow') && !city.includes('москва')) return false;
+  
+  // Check for Seven Sisters building names
+  const sevenSistersKeywords = [
+    'ministry', 'ministry of foreign affairs', 'hotel ukraina', 'hotel leningradskaya',
+    'kotelnicheskaya', 'kudrinskaya', 'red gates', 'ministry of foreign affairs',
+    'seven sisters', 'stalinist', 'высотка', 'сталинская'
+  ];
+  
+  return sevenSistersKeywords.some(keyword => name.includes(keyword));
+};
+
 // Dedupe function that can be called from the frontend
 // Returns list of deleted row IDs that should be blacklisted
 export const dedupeBaserowBuildings = async (): Promise<number[]> => {
@@ -767,19 +820,17 @@ export const dedupeBaserowBuildings = async (): Promise<number[]> => {
       for (let j = i + 1; j < allBuildings.length; j++) {
         if (processed.has(allBuildings[j].id)) continue;
 
-        // Check if buildings are likely the same
-        // Require higher similarity (0.75) OR exact normalized name match for better accuracy
-        const nameSim = nameSimilarity(allBuildings[i].name, allBuildings[j].name);
-        const normalized1 = normalizeNameForMatch(allBuildings[i].name);
-        const normalized2 = normalizeNameForMatch(allBuildings[j].name);
-        const exactMatch = normalized1 === normalized2;
+        // Skip if either building is a Seven Sisters building (exception)
+        if (isSevenSisters(allBuildings[i]) || isSevenSisters(allBuildings[j])) {
+          continue;
+        }
+
+        const distance = getDistance(allBuildings[i].coordinates, allBuildings[j].coordinates);
         
-        // Require higher similarity threshold (0.75) OR exact match, and closer distance (300m)
-        // This makes dedupe less aggressive to avoid false positives
-        if (nameSim >= 0.75 || exactMatch) {
-          const distance = getDistance(allBuildings[i].coordinates, allBuildings[j].coordinates);
-          // Stricter distance: 300m instead of 500m to reduce false matches
-          if (distance < 300) {
+        // Check if within 10km and names share a portion
+        if (distance < 10000) { // 10km
+          // Check if names share a significant portion
+          if (namesSharePortion(allBuildings[i].name, allBuildings[j].name)) {
             group.push(allBuildings[j]);
             processed.add(allBuildings[j].id);
           }
